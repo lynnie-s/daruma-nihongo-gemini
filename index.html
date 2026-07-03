@@ -208,6 +208,80 @@
   }
   .scene-exit-btn:hover{ background:rgba(27,44,71,0.22); }
 
+  /* ---------- Scene picker modal ---------- */
+  .scene-modal-overlay{
+    display:none;
+    position:fixed; inset:0; z-index:50;
+    background:rgba(27,28,27,0.55);
+    align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .scene-modal-overlay.open{ display:flex; }
+  .scene-modal{
+    background:var(--washi-card);
+    border-radius:18px;
+    max-width:520px; width:100%;
+    max-height:85vh;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+  }
+  .scene-modal-header{
+    position:relative;
+    background:linear-gradient(135deg, var(--indigo-deep), var(--indigo));
+    color:var(--washi);
+    height:110px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .scene-banner-img{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; z-index:0;
+  }
+  .scene-modal-header::after{
+    content:"";
+    position:absolute; inset:0; z-index:1;
+    background:linear-gradient(to top, rgba(27,44,71,0.88), rgba(27,44,71,0.15) 70%);
+  }
+  .scene-modal-header h2{
+    position:absolute; left:20px; bottom:14px; z-index:2;
+    font-family:'Zen Maru Gothic',sans-serif; font-size:18px; margin:0; font-weight:700;
+  }
+  .scene-modal-close{
+    position:absolute; top:14px; right:14px; z-index:2;
+    width:28px; height:28px; border-radius:50%; border:none;
+    background:rgba(255,255,255,0.18); color:var(--washi); cursor:pointer; font-size:14px;
+  }
+  .scene-modal-body{
+    padding:16px 18px 20px;
+    overflow-y:auto;
+  }
+  .scene-cat-title{
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:12px; font-weight:700;
+    color:#8a7f5f; margin:14px 0 8px; text-transform:uppercase; letter-spacing:1px;
+  }
+  .scene-cat-title:first-child{ margin-top:0; }
+  .scene-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .scene-card{
+    background:var(--washi-dark);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px;
+    text-align:left;
+    cursor:pointer;
+    font-family:'Noto Sans TC',sans-serif;
+    transition:transform .1s ease, box-shadow .15s ease;
+  }
+  .scene-card:hover{ box-shadow:var(--shadow); transform:translateY(-2px); }
+  .scene-card:active{ transform:scale(0.97); }
+  .scene-card .scene-icon{ font-size:22px; display:block; margin-bottom:6px; }
+  .scene-card .scene-title{ font-size:13.5px; font-weight:700; color:var(--ink); display:block; }
+  .scene-free-card{
+    background:var(--indigo); color:var(--washi); border-radius:12px; padding:12px 14px;
+    text-align:left; cursor:pointer; border:none; width:100%; margin-bottom:4px;
+    font-family:'Noto Sans TC',sans-serif; font-size:13.5px; font-weight:700;
+  }
+
   .typing-dots{ display:flex; gap:4px; padding:6px 4px; }
   .typing-dots span{
     width:6px; height:6px; border-radius:50%; background:var(--indigo); opacity:.4;
@@ -264,22 +338,7 @@
       </div>
     </div>
     <div class="controls">
-      <select id="levelSelect" title="程度を選ぶ">
-        <option value="lv1">初級①(挨拶・基本文型)</option>
-        <option value="lv2" selected>初級②(て形・過去形)</option>
-        <option value="lv3">初級③(可能形・条件形)</option>
-        <option value="free">自由(制限なし)</option>
-      </select>
-      <select id="sceneSelect" title="シーンを選ぶ">
-        <option value="">💬 自由会話(シーンなし)</option>
-        <optgroup label="🏫 学校">
-          <option value="school_intro">自己紹介</option>
-          <option value="school_break">休み時間の雑談</option>
-          <option value="school_class">授業について話す</option>
-          <option value="school_afterschool">放課後の約束</option>
-          <option value="school_borrow">忘れ物・お願いする</option>
-        </optgroup>
-      </select>
+      <button class="pill-btn" id="sceneOpenBtn">📚 レッスンを選ぶ</button>
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
@@ -289,6 +348,17 @@
   <div class="scene-banner" id="sceneBanner" style="display:none;">
     <span class="scene-banner-label" id="sceneBannerLabel"></span>
     <button class="scene-exit-btn" id="sceneExitBtn">✕ シーン終了</button>
+  </div>
+
+  <div class="scene-modal-overlay" id="sceneModalOverlay">
+    <div class="scene-modal">
+      <div class="scene-modal-header has-banner" id="sceneModalHeader">
+        <img class="scene-banner-img" src="scene-banner-school.png" alt="" onerror="this.style.display='none'">
+        <h2>📚 レッスンを選ぼう</h2>
+        <button class="scene-modal-close" id="sceneModalClose">✕</button>
+      </div>
+      <div class="scene-modal-body" id="sceneModalBody"></div>
+    </div>
   </div>
 
   <div class="avatar-wrap">
@@ -335,11 +405,13 @@ const daruma = document.getElementById('daruma');
 const statusCaption = document.getElementById('statusCaption');
 const emptyHint = document.getElementById('emptyHint');
 const appEl = document.getElementById('app');
-const levelSelect = document.getElementById('levelSelect');
 const furiganaToggle = document.getElementById('furiganaToggle');
 const voiceToggle = document.getElementById('voiceToggle');
 const resetBtn = document.getElementById('resetBtn');
-const sceneSelect = document.getElementById('sceneSelect');
+const sceneOpenBtn = document.getElementById('sceneOpenBtn');
+const sceneModalOverlay = document.getElementById('sceneModalOverlay');
+const sceneModalBody = document.getElementById('sceneModalBody');
+const sceneModalClose = document.getElementById('sceneModalClose');
 const sceneBanner = document.getElementById('sceneBanner');
 const sceneBannerLabel = document.getElementById('sceneBannerLabel');
 const sceneExitBtn = document.getElementById('sceneExitBtn');
@@ -358,7 +430,8 @@ let currentSceneKey = '';
 
 const SCENARIOS = {
   school_intro: {
-    label: "学校 ・ 自己紹介",
+    category: "🏫 学校",
+    title: "自己紹介",
     topic: "学校で新しいクラスメートに自己紹介する場面。名前、出身、趣味、好きな科目などを聞き出し、相手の答えに興味を持って自然に話を広げること。",
     opening: [
       {text:"こんにちは",reading:null},{text:"!",reading:null},
@@ -368,7 +441,8 @@ const SCENARIOS = {
     openingZh: "你好!今天開始是同班同學呢。可以自我介紹一下嗎?"
   },
   school_break: {
-    label: "学校 ・ 休み時間の雑談",
+    category: "🏫 学校",
+    title: "休み時間の雑談",
     topic: "学校の休み時間の雑談。最近あった出来事や趣味の話題で気軽に話す。あまり堅苦しくならないようにする。",
     opening: [
       {text:"もうすぐ",reading:null},{text:"休み時間",reading:"やすみじかん"},{text:"だね",reading:null},{text:"。",reading:null},
@@ -377,7 +451,8 @@ const SCENARIOS = {
     openingZh: "快到下課休息時間了呢,現在有什麼有趣的事嗎?"
   },
   school_class: {
-    label: "学校 ・ 授業について話す",
+    category: "🏫 学校",
+    title: "授業について話す",
     topic: "授業の内容や感想について話す場面。得意科目・苦手科目、宿題、テストなどの話題を含めてよい。",
     opening: [
       {text:"今日",reading:"きょう"},{text:"の",reading:null},{text:"授業",reading:"じゅぎょう"},{text:"、",reading:null},
@@ -386,7 +461,8 @@ const SCENARIOS = {
     openingZh: "今天的課怎麼樣?難嗎?"
   },
   school_afterschool: {
-    label: "学校 ・ 放課後の約束",
+    category: "🏫 学校",
+    title: "放課後の約束",
     topic: "放課後の予定について話す場面。遊びに行く、部活、勉強など、具体的な提案や時間の約束をする練習をする。",
     opening: [
       {text:"放課後",reading:"ほうかご"},{text:"、",reading:null},{text:"時間",reading:"じかん"},{text:"ある",reading:null},{text:"?",reading:null},
@@ -395,7 +471,8 @@ const SCENARIOS = {
     openingZh: "放學後有空嗎?要不要一起做點什麼?"
   },
   school_borrow: {
-    label: "学校 ・ 忘れ物・お願いする",
+    category: "🏫 学校",
+    title: "忘れ物・お願いする",
     topic: "忘れ物をしたときに物を貸してほしいとお願いする場面、および頼まれた側としての自然な返事の仕方を練習する。",
     opening: [
       {text:"あれ",reading:null},{text:"、",reading:null},{text:"消しゴム",reading:"けしゴム"},{text:"忘れちゃった",reading:"わすれちゃった"},{text:"。",reading:null},
@@ -405,28 +482,21 @@ const SCENARIOS = {
   }
 };
 
-const LEVELS = {
-  lv1: "初級①:挨拶、です/ます体、基本的な名詞文・形容詞文、は/が/を/に/で などの基本助詞のみ。過去形やて形は使わない。語彙は「文化初級日本語」1〜2課相当の非常に基礎的なものに限る。",
-  lv2: "初級②:です/ます体中心、て形(〜てください/〜ています)、普通の過去形(〜ました/〜でした)、形容詞の活用、比較表現。語彙は「文化初級日本語」2〜3巻相当。",
-  lv3: "初級③:可能形、条件形(〜ば/〜たら/〜と)、意向形、簡単な受身、やり取り表現(あげる/もらう/くれる)まで含む。文化初級日本語3巻後半〜相当。",
-  free: "レベル制限なし。自然な日本語(日常会話レベル、N3〜N2程度まで)で自由に話してよい。ただし難しい漢語や専門用語は避け、会話らしい自然さを優先する。"
-};
-
 function buildSystemPrompt(){
   return `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。
 相手は台湾の大学生で、日本語を勉強中です。以下のルールを厳守してください。
 
 【レベル設定】
-${LEVELS[levelSelect.value]}
+初級②相当:です/ます体中心、て形(〜てください/〜ています)、普通の過去形(〜ました/〜でした)、形容詞の活用、比較表現。語彙は「文化初級日本語」2〜3巻相当。
 ${currentScene ? `
 【シーン設定】
-これは「${currentScene.label}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
+これは「${currentScene.category} ・ ${currentScene.title}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
 話が大きく脱線した場合は、自然にこのテーマに話を戻すよう誘導すること。
 ` : ''}
 【会話の基本姿勢】
 - 相手の日本語に文法・語彙の間違いがあっても、まず言いたいことを推測して理解し、自然に会話を続けること。会話が止まらないようにする。
 - だるまさんらしく親しみやすく、時々励ましの言葉を交える。ただし説教くさくしない。
-- 返信は1〜3文程度、短く自然な会話文にする。
+- 返信は1〜3文程度、短く自然な会話文にする。長くなりすぎないこと。
 
 【出力形式】
 必ず次のJSON形式のみを出力すること。前置き、説明文、コードブロックの記号(バッククォート)は一切つけない。JSONのみ。
@@ -434,6 +504,7 @@ ${currentScene ? `
 {
   "reply": [ {"text":"漢字や仮名の一部分","reading":"その部分の読み(ひらがな)か、読み不要ならnull"}, ... ],
   "replyZh": "replyの繁體中文訳(簡潔に、1文)",
+  "userSegments": [ {"text":"...","reading":"..."} , ... ],
   "correction": {
     "needsCorrection": true または false,
     "correctedSegments": [ {"text":"...","reading":"..."} , ... ],
@@ -441,9 +512,10 @@ ${currentScene ? `
   }
 }
 
-【reply配列・correctedSegments配列共通のルール】
+【reply配列・correctedSegments配列・userSegments配列共通のルール】
 - 全文を、漢字を含む意味の塊ごとに分割すること。漢字を含む部分には対応する読み(ひらがな)をreadingに入れる。ひらがな・カタカナ・句読点のみの部分はreading を null にする。
 - 例: 「今日は暑いですね」→ [{"text":"今日","reading":"きょう"},{"text":"は","reading":null},{"text":"暑い","reading":"あつい"},{"text":"です","reading":null},{"text":"ね","reading":null}]
+- userSegments には、相手が今回送ってきた「元の文(修正前)」をそのまま同じルールで分割すること。文法が間違っていても直さずそのまま使う。
 
 【correctionのルール】
 - 相手のメッセージに明らかな文法・語彙・助詞の誤りがあり、教える価値がある場合のみ needsCorrection を true にし、correctedSegments に自然な日本語に直した相手の文を入れる。些細な口語表現の違いなどは true にしない。
@@ -474,7 +546,7 @@ function addUserMessage(text){
   wrap.appendChild(bubble);
   chatEl.appendChild(wrap);
   scrollToBottom();
-  return wrap;
+  return { wrap, bubble };
 }
 
 function buildCorrectionCard(correction){
@@ -545,7 +617,7 @@ async function callClaude(userText){
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1000,
+        max_tokens: 2500,
         system: buildSystemPrompt(),
         messages: msgs
       })
@@ -570,10 +642,13 @@ async function callClaude(userText){
   let parsed;
   try{
     parsed = JSON.parse(raw);
+    if(!parsed.userSegments) parsed.userSegments = null;
   }catch(e){
+    console.error('JSON解析失敗,原始內容:', raw);
     parsed = {
-      reply:[{text: raw || "すみません、もう一度言ってもらえますか？", reading:null}],
-      replyZh:"",
+      reply:[{text: "ごめん、ちょっと文が長すぎたかも。もう少し短く言ってみてくれる？", reading:null}],
+      replyZh:"抱歉,可能訊息太長處理不完整。可以試著講短一點嗎?",
+      userSegments: null,
       correction:{needsCorrection:false, correctedSegments:[], explanationZh:""}
     };
   }
@@ -615,7 +690,8 @@ async function handleSend(){
   textInput.value='';
   autoResize();
 
-  addUserMessage(text);
+  const userMsg = addUserMessage(text);
+  playSendBlip();
 
   addTyping();
   statusCaption.textContent = '考えています…';
@@ -625,12 +701,17 @@ async function handleSend(){
 
     if(result.correction && result.correction.needsCorrection && result.correction.correctedSegments && result.correction.correctedSegments.length){
       const card = buildCorrectionCard(result.correction);
-      chatEl.appendChild(card);
+      chatEl.insertBefore(card, userMsg.wrap);
       scrollToBottom();
+    }
+
+    if(result.userSegments && result.userSegments.length){
+      userMsg.bubble.innerHTML = renderRuby(result.userSegments);
     }
 
     const plainReply = (result.reply||[]).map(s=>s.text).join('');
     addAiMessage(result.reply || [{text:'…',reading:null}], result.replyZh);
+    playReceiveBlip();
 
     history.push({role:'user', text: text});
     history.push({role:'assistant', text: plainReply});
@@ -723,6 +804,52 @@ voiceToggle.addEventListener('click', ()=>{
   voiceToggle.textContent = '音声 ' + (voiceOn ? 'ON' : 'OFF');
   voiceToggle.classList.toggle('active', voiceOn);
 });
+// ---------- Sound effects (synthesized, no audio files needed) ----------
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(AC) audioCtx = new AC();
+  }
+  return audioCtx;
+}
+function playTone(freq, startTime, duration, gainPeak){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+}
+function playSendBlip(){
+  if(!voiceOn) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const t = ctx.currentTime;
+  playTone(660, t, 0.09, 0.06);
+}
+function playReceiveBlip(){
+  if(!voiceOn) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const t = ctx.currentTime;
+  playTone(520, t, 0.09, 0.05);
+  playTone(780, t + 0.07, 0.12, 0.05);
+}
+function playSceneChime(){
+  if(!voiceOn) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99].forEach((f,i)=> playTone(f, t + i*0.11, 0.35, 0.07));
+}
+
 resetBtn.addEventListener('click', ()=>{
   if(currentSceneKey){
     startScene(currentSceneKey);
@@ -736,18 +863,60 @@ resetBtn.addEventListener('click', ()=>{
 });
 
 // ---------- Scenes ----------
+function renderSceneModal(){
+  const categories = {};
+  Object.keys(SCENARIOS).forEach(key=>{
+    const s = SCENARIOS[key];
+    if(!categories[s.category]) categories[s.category] = [];
+    categories[s.category].push({key, ...s});
+  });
+
+  let html = `<button class="scene-free-card" id="sceneFreeCard">💬 自由会話(シーンなし)</button>`;
+  Object.keys(categories).forEach(cat=>{
+    html += `<div class="scene-cat-title">${escapeHtml(cat)}</div><div class="scene-grid">`;
+    categories[cat].forEach(item=>{
+      html += `<button class="scene-card" data-key="${item.key}">
+        <span class="scene-icon">📖</span>
+        <span class="scene-title">${escapeHtml(item.title)}</span>
+      </button>`;
+    });
+    html += `</div>`;
+  });
+  sceneModalBody.innerHTML = html;
+
+  sceneModalBody.querySelectorAll('.scene-card').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      closeSceneModal();
+      startScene(btn.dataset.key);
+    });
+  });
+  document.getElementById('sceneFreeCard').addEventListener('click', ()=>{
+    closeSceneModal();
+    exitScene();
+  });
+}
+
+function openSceneModal(){
+  renderSceneModal();
+  sceneModalOverlay.classList.add('open');
+}
+function closeSceneModal(){
+  sceneModalOverlay.classList.remove('open');
+}
+
 function startScene(key){
   const scene = SCENARIOS[key];
   if(!scene) return;
   currentScene = scene;
   currentSceneKey = key;
-  sceneSelect.value = key;
   history = [];
   chatEl.innerHTML='';
   window.speechSynthesis.cancel();
   sceneBanner.style.display = 'flex';
-  sceneBannerLabel.textContent = '📚 ' + scene.label;
+  sceneBannerLabel.textContent = '📚 ' + scene.category + ' ・ ' + scene.title;
   emptyHint.style.display = 'none';
+
+  playSceneChime();
 
   const plainOpening = scene.opening.map(s=>s.text).join('');
   addAiMessage(scene.opening, scene.openingZh);
@@ -758,7 +927,6 @@ function startScene(key){
 function exitScene(){
   currentScene = null;
   currentSceneKey = '';
-  sceneSelect.value = '';
   sceneBanner.style.display = 'none';
   history = [];
   chatEl.innerHTML = '';
@@ -767,13 +935,10 @@ function exitScene(){
   window.speechSynthesis.cancel();
 }
 
-sceneSelect.addEventListener('change', ()=>{
-  const val = sceneSelect.value;
-  if(!val){
-    exitScene();
-  }else{
-    startScene(val);
-  }
+sceneOpenBtn.addEventListener('click', openSceneModal);
+sceneModalClose.addEventListener('click', closeSceneModal);
+sceneModalOverlay.addEventListener('click', (e)=>{
+  if(e.target === sceneModalOverlay) closeSceneModal();
 });
 sceneExitBtn.addEventListener('click', exitScene);
 </script>
