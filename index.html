@@ -183,6 +183,30 @@
     margin-top:6px; padding-top:6px; border-top:1px dashed var(--line);
   }
   .correction-card ruby rt{ color:#8a6a2a; }
+  .correction-card .card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .speak-btn{
+    width:26px; height:26px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--mustard); color:var(--indigo-deep); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .1s ease;
+  }
+  .speak-btn:active{ transform:scale(0.9); }
+  .speak-btn svg{ width:13px; height:13px; }
+
+  /* ---------- Scene banner ---------- */
+  .scene-banner{
+    background:var(--mustard);
+    color:var(--indigo-deep);
+    padding:8px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:12.5px; font-weight:700;
+  }
+  .scene-exit-btn{
+    background:rgba(27,44,71,0.12); border:none; color:var(--indigo-deep);
+    font-size:11px; padding:4px 10px; border-radius:12px; cursor:pointer;
+    font-family:'Zen Kaku Gothic New',sans-serif;
+  }
+  .scene-exit-btn:hover{ background:rgba(27,44,71,0.22); }
 
   .typing-dots{ display:flex; gap:4px; padding:6px 4px; }
   .typing-dots span{
@@ -246,11 +270,26 @@
         <option value="lv3">初級③(可能形・条件形)</option>
         <option value="free">自由(制限なし)</option>
       </select>
+      <select id="sceneSelect" title="シーンを選ぶ">
+        <option value="">💬 自由会話(シーンなし)</option>
+        <optgroup label="🏫 学校">
+          <option value="school_intro">自己紹介</option>
+          <option value="school_break">休み時間の雑談</option>
+          <option value="school_class">授業について話す</option>
+          <option value="school_afterschool">放課後の約束</option>
+          <option value="school_borrow">忘れ物・お願いする</option>
+        </optgroup>
+      </select>
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
     </div>
   </header>
+
+  <div class="scene-banner" id="sceneBanner" style="display:none;">
+    <span class="scene-banner-label" id="sceneBannerLabel"></span>
+    <button class="scene-exit-btn" id="sceneExitBtn">✕ シーン終了</button>
+  </div>
 
   <div class="avatar-wrap">
     <svg class="daruma" id="daruma" viewBox="-40 -40 80 80">
@@ -300,6 +339,10 @@ const levelSelect = document.getElementById('levelSelect');
 const furiganaToggle = document.getElementById('furiganaToggle');
 const voiceToggle = document.getElementById('voiceToggle');
 const resetBtn = document.getElementById('resetBtn');
+const sceneSelect = document.getElementById('sceneSelect');
+const sceneBanner = document.getElementById('sceneBanner');
+const sceneBannerLabel = document.getElementById('sceneBannerLabel');
+const sceneExitBtn = document.getElementById('sceneExitBtn');
 
 if(window.location.protocol === 'file:'){
   emptyHint.innerHTML = '⚠️ 偵測到你是直接開啟本機檔案(file://)。<br>這個 App 需要透過網頁伺服器執行(例如部署到 Vercel 後的網址),直接雙擊開啟 HTML 檔案是無法連線後端 API 的。';
@@ -310,6 +353,57 @@ let history = []; // {role:'user'|'assistant', text:'plain text'}
 let furiganaOn = true;
 let voiceOn = true;
 let isProcessing = false;
+let currentScene = null;
+let currentSceneKey = '';
+
+const SCENARIOS = {
+  school_intro: {
+    label: "学校 ・ 自己紹介",
+    topic: "学校で新しいクラスメートに自己紹介する場面。名前、出身、趣味、好きな科目などを聞き出し、相手の答えに興味を持って自然に話を広げること。",
+    opening: [
+      {text:"こんにちは",reading:null},{text:"!",reading:null},
+      {text:"今日",reading:"きょう"},{text:"から",reading:null},{text:"同じ",reading:"おなじ"},{text:"クラス",reading:null},{text:"です",reading:null},{text:"ね",reading:null},{text:"。",reading:null},
+      {text:"自己紹介",reading:"じこしょうかい"},{text:"してくれますか",reading:null},{text:"?",reading:null}
+    ],
+    openingZh: "你好!今天開始是同班同學呢。可以自我介紹一下嗎?"
+  },
+  school_break: {
+    label: "学校 ・ 休み時間の雑談",
+    topic: "学校の休み時間の雑談。最近あった出来事や趣味の話題で気軽に話す。あまり堅苦しくならないようにする。",
+    opening: [
+      {text:"もうすぐ",reading:null},{text:"休み時間",reading:"やすみじかん"},{text:"だね",reading:null},{text:"。",reading:null},
+      {text:"今",reading:"いま"},{text:"何か",reading:"なにか"},{text:"面白い",reading:"おもしろい"},{text:"こと",reading:null},{text:"あった",reading:null},{text:"?",reading:null}
+    ],
+    openingZh: "快到下課休息時間了呢,現在有什麼有趣的事嗎?"
+  },
+  school_class: {
+    label: "学校 ・ 授業について話す",
+    topic: "授業の内容や感想について話す場面。得意科目・苦手科目、宿題、テストなどの話題を含めてよい。",
+    opening: [
+      {text:"今日",reading:"きょう"},{text:"の",reading:null},{text:"授業",reading:"じゅぎょう"},{text:"、",reading:null},
+      {text:"どうだった",reading:null},{text:"?",reading:null},{text:"難しかった",reading:"むずかしかった"},{text:"?",reading:null}
+    ],
+    openingZh: "今天的課怎麼樣?難嗎?"
+  },
+  school_afterschool: {
+    label: "学校 ・ 放課後の約束",
+    topic: "放課後の予定について話す場面。遊びに行く、部活、勉強など、具体的な提案や時間の約束をする練習をする。",
+    opening: [
+      {text:"放課後",reading:"ほうかご"},{text:"、",reading:null},{text:"時間",reading:"じかん"},{text:"ある",reading:null},{text:"?",reading:null},
+      {text:"一緒に",reading:"いっしょに"},{text:"何か",reading:"なにか"},{text:"しない",reading:null},{text:"?",reading:null}
+    ],
+    openingZh: "放學後有空嗎?要不要一起做點什麼?"
+  },
+  school_borrow: {
+    label: "学校 ・ 忘れ物・お願いする",
+    topic: "忘れ物をしたときに物を貸してほしいとお願いする場面、および頼まれた側としての自然な返事の仕方を練習する。",
+    opening: [
+      {text:"あれ",reading:null},{text:"、",reading:null},{text:"消しゴム",reading:"けしゴム"},{text:"忘れちゃった",reading:"わすれちゃった"},{text:"。",reading:null},
+      {text:"貸してもらえる",reading:"かしてもらえる"},{text:"?",reading:null}
+    ],
+    openingZh: "咦,我忘記帶橡皮擦了,可以借我嗎?"
+  }
+};
 
 const LEVELS = {
   lv1: "初級①:挨拶、です/ます体、基本的な名詞文・形容詞文、は/が/を/に/で などの基本助詞のみ。過去形やて形は使わない。語彙は「文化初級日本語」1〜2課相当の非常に基礎的なものに限る。",
@@ -324,7 +418,11 @@ function buildSystemPrompt(){
 
 【レベル設定】
 ${LEVELS[levelSelect.value]}
-
+${currentScene ? `
+【シーン設定】
+これは「${currentScene.label}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
+話が大きく脱線した場合は、自然にこのテーマに話を戻すよう誘導すること。
+` : ''}
 【会話の基本姿勢】
 - 相手の日本語に文法・語彙の間違いがあっても、まず言いたいことを推測して理解し、自然に会話を続けること。会話が止まらないようにする。
 - だるまさんらしく親しみやすく、時々励ましの言葉を交える。ただし説教くさくしない。
@@ -382,11 +480,18 @@ function addUserMessage(text){
 function buildCorrectionCard(correction){
   const card = document.createElement('div');
   card.className='correction-card';
+  const plainCorrected = (correction.correctedSegments || []).map(s=>s.text).join('');
   card.innerHTML = `
-    <div class="label">💡 正確な言い方</div>
+    <div class="card-head">
+      <div class="label">💡 正確な言い方</div>
+      <button class="speak-btn" title="発音を聞く">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </button>
+    </div>
     <span class="corrected-jp">${renderRuby(correction.correctedSegments || [])}</span>
     ${correction.explanationZh ? `<div class="correction-explain">${escapeHtml(correction.explanationZh)}</div>` : ''}
   `;
+  card.querySelector('.speak-btn').addEventListener('click', ()=> speak(plainCorrected));
   return card;
 }
 
@@ -619,12 +724,58 @@ voiceToggle.addEventListener('click', ()=>{
   voiceToggle.classList.toggle('active', voiceOn);
 });
 resetBtn.addEventListener('click', ()=>{
+  if(currentSceneKey){
+    startScene(currentSceneKey);
+    return;
+  }
   history = [];
   chatEl.innerHTML='';
   chatEl.appendChild(emptyHint);
   emptyHint.style.display='block';
   window.speechSynthesis.cancel();
 });
+
+// ---------- Scenes ----------
+function startScene(key){
+  const scene = SCENARIOS[key];
+  if(!scene) return;
+  currentScene = scene;
+  currentSceneKey = key;
+  sceneSelect.value = key;
+  history = [];
+  chatEl.innerHTML='';
+  window.speechSynthesis.cancel();
+  sceneBanner.style.display = 'flex';
+  sceneBannerLabel.textContent = '📚 ' + scene.label;
+  emptyHint.style.display = 'none';
+
+  const plainOpening = scene.opening.map(s=>s.text).join('');
+  addAiMessage(scene.opening, scene.openingZh);
+  history.push({role:'assistant', text: plainOpening});
+  speak(plainOpening);
+}
+
+function exitScene(){
+  currentScene = null;
+  currentSceneKey = '';
+  sceneSelect.value = '';
+  sceneBanner.style.display = 'none';
+  history = [];
+  chatEl.innerHTML = '';
+  chatEl.appendChild(emptyHint);
+  emptyHint.style.display = 'block';
+  window.speechSynthesis.cancel();
+}
+
+sceneSelect.addEventListener('change', ()=>{
+  const val = sceneSelect.value;
+  if(!val){
+    exitScene();
+  }else{
+    startScene(val);
+  }
+});
+sceneExitBtn.addEventListener('click', exitScene);
 </script>
 </body>
 </html>
