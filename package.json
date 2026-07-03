@@ -1,0 +1,7 @@
+{
+  "name": "daruma-nihongo",
+  "version": "1.0.0",
+  "description": "だるま日本語 - AI日本語会話練習アプリ (Gemini API + Vercel serverless)",
+  "private": true,
+  "type": "module"
+}
