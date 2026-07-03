@@ -207,6 +207,64 @@
     font-family:'Zen Kaku Gothic New',sans-serif;
   }
   .scene-exit-btn:hover{ background:rgba(27,44,71,0.22); }
+  .scene-score{
+    background:rgba(27,44,71,0.14); color:var(--indigo-deep);
+    padding:3px 10px; border-radius:12px; font-size:11.5px; font-weight:700;
+    font-family:'Zen Kaku Gothic New',sans-serif;
+  }
+
+  /* ---------- Word lookup popup ---------- */
+  .word-chip{ cursor:pointer; border-bottom:1.5px dotted rgba(43,69,112,0.4); transition:background .1s ease; border-radius:3px; }
+  .word-chip:hover, .word-chip:active{ background:rgba(224,164,88,0.25); }
+  .msg.user .word-chip{ border-bottom-color:rgba(247,240,227,0.5); }
+  .msg.user .word-chip:hover, .msg.user .word-chip:active{ background:rgba(255,255,255,0.15); }
+  .word-popup{
+    display:none;
+    position:fixed;
+    z-index:200;
+    background:var(--indigo-deep);
+    color:var(--washi);
+    padding:6px 12px;
+    border-radius:10px;
+    font-size:12.5px;
+    font-family:'Noto Sans TC',sans-serif;
+    max-width:200px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.25);
+    pointer-events:none;
+  }
+
+  /* ---------- Clear (level-up) modal ---------- */
+  .clear-modal-overlay{
+    display:none;
+    position:fixed; inset:0; z-index:60;
+    background:rgba(27,28,27,0.6);
+    align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .clear-modal-overlay.open{ display:flex; }
+  .clear-modal{
+    background:var(--washi-card);
+    border-radius:18px;
+    max-width:380px; width:100%;
+    padding:28px 24px;
+    text-align:center;
+    box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  }
+  .clear-daruma{ font-size:44px; margin-bottom:6px; }
+  .clear-modal h2{
+    font-family:'Zen Maru Gothic',sans-serif; font-size:19px; color:var(--vermillion); margin:0 0 8px;
+  }
+  .clear-modal p{
+    font-size:13px; color:#5c5040; line-height:1.7; margin:0 0 20px;
+    font-family:'Noto Sans TC',sans-serif;
+  }
+  .clear-modal-actions{ display:flex; flex-direction:column; gap:10px; }
+  .clear-btn{
+    border:none; border-radius:14px; padding:12px; font-size:14px; font-weight:700;
+    cursor:pointer; font-family:'Noto Sans TC',sans-serif;
+  }
+  .clear-btn-primary{ background:var(--vermillion); color:#fff; }
+  .clear-btn-secondary{ background:var(--washi-dark); color:var(--indigo-deep); border:1px solid var(--line); }
 
   /* ---------- Scene picker modal ---------- */
   .scene-modal-overlay{
@@ -347,8 +405,23 @@
 
   <div class="scene-banner" id="sceneBanner" style="display:none;">
     <span class="scene-banner-label" id="sceneBannerLabel"></span>
+    <span class="scene-score" id="sceneScoreLabel">🌟 0/5</span>
     <button class="scene-exit-btn" id="sceneExitBtn">✕ シーン終了</button>
   </div>
+
+  <div class="clear-modal-overlay" id="clearModalOverlay">
+    <div class="clear-modal">
+      <div class="clear-daruma">🎉</div>
+      <h2>クリア!よくできました!</h2>
+      <p id="clearModalText">このシーンのレッスンをクリアしたよ!次に進む?それともこのまま話し続ける?</p>
+      <div class="clear-modal-actions">
+        <button class="clear-btn clear-btn-primary" id="clearGoNextBtn">🎯 次のシーンへ</button>
+        <button class="clear-btn clear-btn-secondary" id="clearStayBtn">💬 このまま続ける</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="word-popup" id="wordPopup"></div>
 
   <div class="scene-modal-overlay" id="sceneModalOverlay">
     <div class="scene-modal">
@@ -414,7 +487,13 @@ const sceneModalBody = document.getElementById('sceneModalBody');
 const sceneModalClose = document.getElementById('sceneModalClose');
 const sceneBanner = document.getElementById('sceneBanner');
 const sceneBannerLabel = document.getElementById('sceneBannerLabel');
+const sceneScoreLabel = document.getElementById('sceneScoreLabel');
 const sceneExitBtn = document.getElementById('sceneExitBtn');
+const wordPopup = document.getElementById('wordPopup');
+const clearModalOverlay = document.getElementById('clearModalOverlay');
+const clearModalText = document.getElementById('clearModalText');
+const clearGoNextBtn = document.getElementById('clearGoNextBtn');
+const clearStayBtn = document.getElementById('clearStayBtn');
 
 if(window.location.protocol === 'file:'){
   emptyHint.innerHTML = '⚠️ 偵測到你是直接開啟本機檔案(file://)。<br>這個 App 需要透過網頁伺服器執行(例如部署到 Vercel 後的網址),直接雙擊開啟 HTML 檔案是無法連線後端 API 的。';
@@ -427,60 +506,69 @@ let voiceOn = true;
 let isProcessing = false;
 let currentScene = null;
 let currentSceneKey = '';
+let sceneScore = 0;
+let sceneCleared = false;
 
 const SCENARIOS = {
   school_intro: {
     category: "🏫 学校",
     title: "自己紹介",
+    difficulty: 1,
     topic: "学校で新しいクラスメートに自己紹介する場面。名前、出身、趣味、好きな科目などを聞き出し、相手の答えに興味を持って自然に話を広げること。",
     opening: [
-      {text:"こんにちは",reading:null},{text:"!",reading:null},
-      {text:"今日",reading:"きょう"},{text:"から",reading:null},{text:"同じ",reading:"おなじ"},{text:"クラス",reading:null},{text:"です",reading:null},{text:"ね",reading:null},{text:"。",reading:null},
-      {text:"自己紹介",reading:"じこしょうかい"},{text:"してくれますか",reading:null},{text:"?",reading:null}
+      {text:"こんにちは",reading:null,meaning:"你好"},{text:"!",reading:null,meaning:null},
+      {text:"今日",reading:"きょう",meaning:"今天"},{text:"から",reading:null,meaning:"從~開始"},{text:"同じ",reading:"おなじ",meaning:"相同的"},{text:"クラス",reading:null,meaning:"班級"},{text:"です",reading:null,meaning:"是(禮貌)"},{text:"ね",reading:null,meaning:"呢(尋求同意)"},{text:"。",reading:null,meaning:null},
+      {text:"自己紹介",reading:"じこしょうかい",meaning:"自我介紹"},{text:"してくれますか",reading:null,meaning:"可以幫我做~嗎"},{text:"?",reading:null,meaning:null}
     ],
     openingZh: "你好!今天開始是同班同學呢。可以自我介紹一下嗎?"
   },
   school_break: {
     category: "🏫 学校",
     title: "休み時間の雑談",
+    difficulty: 2,
     topic: "学校の休み時間の雑談。最近あった出来事や趣味の話題で気軽に話す。あまり堅苦しくならないようにする。",
     opening: [
-      {text:"もうすぐ",reading:null},{text:"休み時間",reading:"やすみじかん"},{text:"だね",reading:null},{text:"。",reading:null},
-      {text:"今",reading:"いま"},{text:"何か",reading:"なにか"},{text:"面白い",reading:"おもしろい"},{text:"こと",reading:null},{text:"あった",reading:null},{text:"?",reading:null}
+      {text:"もうすぐ",reading:null,meaning:"快要、馬上"},{text:"休み時間",reading:"やすみじかん",meaning:"休息時間"},{text:"だね",reading:null,meaning:"對吧"},{text:"。",reading:null,meaning:null},
+      {text:"今",reading:"いま",meaning:"現在"},{text:"何か",reading:"なにか",meaning:"什麼事"},{text:"面白い",reading:"おもしろい",meaning:"有趣的"},{text:"こと",reading:null,meaning:"事情"},{text:"あった",reading:null,meaning:"有過(あるー過去式)"},{text:"?",reading:null,meaning:null}
     ],
     openingZh: "快到下課休息時間了呢,現在有什麼有趣的事嗎?"
   },
   school_class: {
     category: "🏫 学校",
     title: "授業について話す",
+    difficulty: 2,
     topic: "授業の内容や感想について話す場面。得意科目・苦手科目、宿題、テストなどの話題を含めてよい。",
     opening: [
-      {text:"今日",reading:"きょう"},{text:"の",reading:null},{text:"授業",reading:"じゅぎょう"},{text:"、",reading:null},
-      {text:"どうだった",reading:null},{text:"?",reading:null},{text:"難しかった",reading:"むずかしかった"},{text:"?",reading:null}
+      {text:"今日",reading:"きょう",meaning:"今天"},{text:"の",reading:null,meaning:"的"},{text:"授業",reading:"じゅぎょう",meaning:"課程、上課"},{text:"、",reading:null,meaning:null},
+      {text:"どうだった",reading:null,meaning:"怎麼樣呢(過去式)"},{text:"?",reading:null,meaning:null},{text:"難しかった",reading:"むずかしかった",meaning:"(之前)很難"},{text:"?",reading:null,meaning:null}
     ],
     openingZh: "今天的課怎麼樣?難嗎?"
   },
   school_afterschool: {
     category: "🏫 学校",
     title: "放課後の約束",
+    difficulty: 3,
     topic: "放課後の予定について話す場面。遊びに行く、部活、勉強など、具体的な提案や時間の約束をする練習をする。",
     opening: [
-      {text:"放課後",reading:"ほうかご"},{text:"、",reading:null},{text:"時間",reading:"じかん"},{text:"ある",reading:null},{text:"?",reading:null},
-      {text:"一緒に",reading:"いっしょに"},{text:"何か",reading:"なにか"},{text:"しない",reading:null},{text:"?",reading:null}
+      {text:"放課後",reading:"ほうかご",meaning:"放學後"},{text:"、",reading:null,meaning:null},{text:"時間",reading:"じかん",meaning:"時間"},{text:"ある",reading:null,meaning:"有"},{text:"?",reading:null,meaning:null},
+      {text:"一緒に",reading:"いっしょに",meaning:"一起"},{text:"何か",reading:"なにか",meaning:"什麼"},{text:"しない",reading:null,meaning:"要不要做(邀約)"},{text:"?",reading:null,meaning:null}
     ],
     openingZh: "放學後有空嗎?要不要一起做點什麼?"
   },
   school_borrow: {
     category: "🏫 学校",
     title: "忘れ物・お願いする",
+    difficulty: 3,
     topic: "忘れ物をしたときに物を貸してほしいとお願いする場面、および頼まれた側としての自然な返事の仕方を練習する。",
     opening: [
-      {text:"あれ",reading:null},{text:"、",reading:null},{text:"消しゴム",reading:"けしゴム"},{text:"忘れちゃった",reading:"わすれちゃった"},{text:"。",reading:null},
-      {text:"貸してもらえる",reading:"かしてもらえる"},{text:"?",reading:null}
+      {text:"あれ",reading:null,meaning:"咦(驚訝的感嘆詞)"},{text:"、",reading:null,meaning:null},{text:"消しゴム",reading:"けしゴム",meaning:"橡皮擦"},{text:"忘れちゃった",reading:"わすれちゃった",meaning:"忘記帶了(口語)"},{text:"。",reading:null,meaning:null},
+      {text:"貸してもらえる",reading:"かしてもらえる",meaning:"可以借我嗎"},{text:"?",reading:null,meaning:null}
     ],
     openingZh: "咦,我忘記帶橡皮擦了,可以借我嗎?"
   }
 };
+
+const SCENE_TARGET_SCORE = 5;
 
 function buildSystemPrompt(){
   return `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。
@@ -502,19 +590,20 @@ ${currentScene ? `
 必ず次のJSON形式のみを出力すること。前置き、説明文、コードブロックの記号(バッククォート)は一切つけない。JSONのみ。
 
 {
-  "reply": [ {"text":"漢字や仮名の一部分","reading":"その部分の読み(ひらがな)か、読み不要ならnull"}, ... ],
+  "reply": [ {"text":"漢字や仮名の一部分","reading":"その部分の読み(ひらがな)か、読み不要ならnull","meaning":"その部分の簡潔な繁體中文の意味(助詞や記号の場合はnull可)"}, ... ],
   "replyZh": "replyの繁體中文訳(簡潔に、1文)",
-  "userSegments": [ {"text":"...","reading":"..."} , ... ],
+  "userSegments": [ {"text":"...","reading":"...","meaning":"..."} , ... ],
   "correction": {
     "needsCorrection": true または false,
-    "correctedSegments": [ {"text":"...","reading":"..."} , ... ],
+    "correctedSegments": [ {"text":"...","reading":"...","meaning":"..."} , ... ],
     "explanationZh": "何が間違っていたかの簡潔な繁體中文解説、1文、句読点に——(em dash)は使わない(needsCorrectionがtrueの時のみ、無ければ空配列/空文字)"
   }
 }
 
 【reply配列・correctedSegments配列・userSegments配列共通のルール】
 - 全文を、漢字を含む意味の塊ごとに分割すること。漢字を含む部分には対応する読み(ひらがな)をreadingに入れる。ひらがな・カタカナ・句読点のみの部分はreading を null にする。
-- 例: 「今日は暑いですね」→ [{"text":"今日","reading":"きょう"},{"text":"は","reading":null},{"text":"暑い","reading":"あつい"},{"text":"です","reading":null},{"text":"ね","reading":null}]
+- 各要素の meaning には、その単語・表現の簡潔な繁體中文の意味を入れる(例:「食べます」→「吃(禮貌形)」)。「、」「。」「?」などの記号や意味を持たない断片は meaning を null にする。
+- 例: 「今日は暑いですね」→ [{"text":"今日","reading":"きょう","meaning":"今天"},{"text":"は","reading":null,"meaning":"表示主題的助詞"},{"text":"暑い","reading":"あつい","meaning":"熱的"},{"text":"です","reading":null,"meaning":"是(禮貌形)"},{"text":"ね","reading":null,"meaning":"呢(尋求同意的語氣詞)"}]
 - userSegments には、相手が今回送ってきた「元の文(修正前)」をそのまま同じルールで分割すること。文法が間違っていても直さずそのまま使う。
 
 【correctionのルール】
@@ -526,10 +615,13 @@ function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
 
 function renderRuby(segments){
   return segments.map(seg=>{
-    if(seg.reading && seg.reading.trim()){
-      return `<ruby>${escapeHtml(seg.text)}<rt>${escapeHtml(seg.reading)}</rt></ruby>`;
+    const inner = (seg.reading && seg.reading.trim())
+      ? `<ruby>${escapeHtml(seg.text)}<rt>${escapeHtml(seg.reading)}</rt></ruby>`
+      : escapeHtml(seg.text);
+    if(seg.meaning && seg.meaning.trim()){
+      return `<span class="word-chip" data-meaning="${escapeHtml(seg.meaning)}">${inner}</span>`;
     }
-    return escapeHtml(seg.text);
+    return inner;
   }).join('');
 }
 function escapeHtml(s){
@@ -617,7 +709,7 @@ async function callClaude(userText){
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 2500,
+        max_tokens: 3200,
         system: buildSystemPrompt(),
         messages: msgs
       })
@@ -712,6 +804,18 @@ async function handleSend(){
     const plainReply = (result.reply||[]).map(s=>s.text).join('');
     addAiMessage(result.reply || [{text:'…',reading:null}], result.replyZh);
     playReceiveBlip();
+
+    if(currentScene && !sceneCleared){
+      const wasCorrect = !(result.correction && result.correction.needsCorrection);
+      if(wasCorrect){
+        sceneScore++;
+        updateSceneScoreLabel();
+        if(sceneScore >= SCENE_TARGET_SCORE){
+          sceneCleared = true;
+          setTimeout(showClearModal, 500);
+        }
+      }
+    }
 
     history.push({role:'user', text: text});
     history.push({role:'assistant', text: plainReply});
@@ -909,11 +1013,14 @@ function startScene(key){
   if(!scene) return;
   currentScene = scene;
   currentSceneKey = key;
+  sceneScore = 0;
+  sceneCleared = false;
   history = [];
   chatEl.innerHTML='';
   window.speechSynthesis.cancel();
   sceneBanner.style.display = 'flex';
   sceneBannerLabel.textContent = '📚 ' + scene.category + ' ・ ' + scene.title;
+  updateSceneScoreLabel();
   emptyHint.style.display = 'none';
 
   playSceneChime();
@@ -924,9 +1031,48 @@ function startScene(key){
   speak(plainOpening);
 }
 
+function updateSceneScoreLabel(){
+  sceneScoreLabel.textContent = '🌟 ' + Math.min(sceneScore, SCENE_TARGET_SCORE) + '/' + SCENE_TARGET_SCORE;
+}
+
+function showClearModal(){
+  playSceneChime();
+  const harderExists = Object.values(SCENARIOS).some(s => s.difficulty > (currentScene ? currentScene.difficulty : 0));
+  clearModalText.textContent = harderExists
+    ? 'このシーンのレッスンをクリアしたよ!もっと難しいシーンに挑戦する?それともこのまま話し続ける?'
+    : 'このシーンのレッスンをクリアしたよ!すごいね!このまま自由に話し続けよう。';
+  clearGoNextBtn.style.display = harderExists ? 'block' : 'none';
+  clearModalOverlay.classList.add('open');
+}
+function hideClearModal(){
+  clearModalOverlay.classList.remove('open');
+}
+clearGoNextBtn.addEventListener('click', ()=>{
+  hideClearModal();
+  openSceneModal();
+});
+clearStayBtn.addEventListener('click', hideClearModal);
+
+// ---------- Word lookup popup ----------
+document.addEventListener('click', (e)=>{
+  const chip = e.target.closest('.word-chip');
+  if(chip){
+    const rect = chip.getBoundingClientRect();
+    wordPopup.textContent = chip.dataset.meaning;
+    wordPopup.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 160)) + 'px';
+    wordPopup.style.top = Math.max(8, rect.top - 36) + 'px';
+    wordPopup.style.display = 'block';
+    e.stopPropagation();
+  } else if(!e.target.closest('.word-popup')){
+    wordPopup.style.display = 'none';
+  }
+});
+
 function exitScene(){
   currentScene = null;
   currentSceneKey = '';
+  sceneScore = 0;
+  sceneCleared = false;
   sceneBanner.style.display = 'none';
   history = [];
   chatEl.innerHTML = '';
