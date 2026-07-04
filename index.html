@@ -1130,7 +1130,10 @@ async function startScene(lessonKey, characterId){
     removeTyping();
     statusCaption.textContent = '';
     console.error('シーン開始エラー:', e);
-    addAiMessage([{text:'あれ、うまく始められなかったみたい。もう一度シーンを選んでみてね。',reading:null}], '抱歉,情境開場失敗了,請重新選擇一次試試看。');
+    addAiMessage(
+      [{text:'あれ、エラーが出た: ' + (e.message || e), reading:null}],
+      '除錯用的實際錯誤訊息(可以截圖給開發者看):' + (e.message || e)
+    );
   }
 }
 
