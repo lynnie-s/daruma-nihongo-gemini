@@ -72,6 +72,14 @@
     font-size:11px; font-weight:400; color:var(--mustard); letter-spacing:2px;
   }
   .title-block p{margin:2px 0 0; font-size:12px; color:#C9D3E4; font-family:'Zen Kaku Gothic New',sans-serif;}
+  .header-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .student-badge{
+    flex-shrink:0;
+    background:rgba(255,255,255,0.1); border:1px solid rgba(247,240,227,0.35);
+    color:var(--washi); border-radius:16px; padding:5px 12px; font-size:12px;
+    font-family:'Zen Kaku Gothic New',sans-serif; cursor:pointer; position:relative; z-index:1;
+  }
+  .student-badge:hover{ background:rgba(255,255,255,0.18); }
 
   .controls{
     display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; position:relative; z-index:1;
@@ -489,6 +497,7 @@
         <h1>だるま日本語 <small>DARUMA NIHONGO</small></h1>
         <p>七転び八起き ・ 説き間違えながら話そう</p>
       </div>
+      <button class="student-badge" id="studentBadge">👤 …</button>
     </div>
     <div class="controls">
       <button class="pill-btn" id="sceneOpenBtn">📚 レッスンを選ぶ</button>
@@ -509,6 +518,18 @@
     <span class="scene-banner-label" id="sceneBannerLabel"></span>
     <span class="scene-score" id="sceneScoreLabel">🌟 0/5</span>
     <button class="scene-exit-btn" id="sceneExitBtn">✕ シーン終了</button>
+  </div>
+
+  <div class="clear-modal-overlay" id="nameModalOverlay">
+    <div class="clear-modal">
+      <div class="clear-daruma">👋</div>
+      <h2>はじめまして!</h2>
+      <p>先生が誰の記録か分かるように、名前を教えてね。</p>
+      <input type="text" id="nameModalInput" placeholder="例:王小明" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:15px; margin-bottom:14px; box-sizing:border-box; font-family:'Noto Sans TC',sans-serif;">
+      <div class="clear-modal-actions">
+        <button class="clear-btn clear-btn-primary" id="nameModalSaveBtn">始める</button>
+      </div>
+    </div>
   </div>
 
   <div class="clear-modal-overlay" id="clearModalOverlay">
@@ -612,6 +633,10 @@ const clearModalOverlay = document.getElementById('clearModalOverlay');
 const clearModalText = document.getElementById('clearModalText');
 const clearGoNextBtn = document.getElementById('clearGoNextBtn');
 const clearStayBtn = document.getElementById('clearStayBtn');
+const studentBadge = document.getElementById('studentBadge');
+const nameModalOverlay = document.getElementById('nameModalOverlay');
+const nameModalInput = document.getElementById('nameModalInput');
+const nameModalSaveBtn = document.getElementById('nameModalSaveBtn');
 
 if(window.location.protocol === 'file:'){
   emptyHint.innerHTML = '⚠️ 偵測到你是直接開啟本機檔案(file://)。<br>這個 App 需要透過網頁伺服器執行(例如部署到 Vercel 後的網址),直接雙擊開啟 HTML 檔案是無法連線後端 API 的。';
@@ -1126,6 +1151,7 @@ async function handleSend(){
         if(sceneScore >= SCENE_TARGET_SCORE){
           sceneCleared = true;
           setTimeout(showClearModal, 500);
+          recordProgress();
         }
       }
     }
@@ -1525,6 +1551,67 @@ levelModalClose.addEventListener('click', closeLevelModal);
 levelModalOverlay.addEventListener('click', (e)=>{
   if(e.target === levelModalOverlay) closeLevelModal();
 });
+
+// ---------- Student name & progress tracking ----------
+const STUDENT_NAME_KEY = 'daruma_student_name';
+
+function getStudentName(){
+  return localStorage.getItem(STUDENT_NAME_KEY) || '';
+}
+function setStudentName(name){
+  localStorage.setItem(STUDENT_NAME_KEY, name);
+  studentBadge.textContent = '👤 ' + name;
+}
+function showNameModal(prefill){
+  nameModalInput.value = prefill || '';
+  nameModalOverlay.classList.add('open');
+  setTimeout(()=> nameModalInput.focus(), 50);
+}
+function hideNameModal(){
+  nameModalOverlay.classList.remove('open');
+}
+
+function saveNameModal(){
+  const name = nameModalInput.value.trim();
+  if(!name) return;
+  setStudentName(name);
+  hideNameModal();
+}
+nameModalSaveBtn.addEventListener('click', saveNameModal);
+nameModalInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') saveNameModal(); });
+studentBadge.addEventListener('click', ()=> showNameModal(getStudentName()));
+
+// 初次載入:如果還沒有名字,跳出輸入視窗;有的話直接顯示在徽章上
+(function initStudentName(){
+  const existing = getStudentName();
+  if(existing){
+    studentBadge.textContent = '👤 ' + existing;
+  }else{
+    showNameModal('');
+  }
+})();
+
+async function recordProgress(){
+  const name = getStudentName();
+  if(!name || !currentScene) return;
+  try{
+    await fetch('/api/progress', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        studentName: name,
+        locationKey: currentScene.locationKey,
+        lessonKey: currentSceneKey,
+        lessonTitle: currentScene.title,
+        characterId: currentCharacterId,
+        characterName: currentCharacter ? currentCharacter.name : '',
+        score: sceneScore
+      })
+    });
+  }catch(e){
+    console.error('進度記録エラー(気にしなくて大丈夫):', e);
+  }
+}
 </script>
 </body>
 </html>

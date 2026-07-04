@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>だるま日本語 - 老師後台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B1B1B; --washi:#F7F0E3; --washi-card:#FFFBF2; --washi-dark:#EAE0C8;
+    --indigo:#2B4570; --indigo-deep:#1B2C47; --vermillion:#C1440E; --mustard:#E0A458; --line:#D8CBA6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Noto Sans TC',sans-serif; background:var(--washi); color:var(--ink);
+    padding:24px 16px 60px;
+  }
+  .wrap{ max-width:900px; margin:0 auto; }
+  h1{
+    font-family:'Zen Maru Gothic',sans-serif; color:var(--indigo-deep); font-size:24px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .login-box{
+    background:var(--washi-card); border:1px solid var(--line); border-radius:14px;
+    padding:24px; max-width:360px; margin:60px auto; text-align:center;
+  }
+  .login-box input{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    font-size:15px; margin:12px 0; box-sizing:border-box;
+  }
+  .login-box button, .toolbar button{
+    background:var(--indigo); color:var(--washi); border:none; border-radius:10px;
+    padding:10px 18px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .login-box button:hover, .toolbar button:hover{ background:var(--indigo-deep); }
+  .error-msg{ color:var(--vermillion); font-size:13px; margin-top:8px; }
+
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .stat-cards{ display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+  .stat-card{
+    background:var(--washi-card); border:1px solid var(--line); border-radius:12px;
+    padding:14px 18px; min-width:120px;
+  }
+  .stat-card .num{ font-size:26px; font-weight:900; color:var(--vermillion); font-family:'Zen Maru Gothic',sans-serif; }
+  .stat-card .label{ font-size:12px; color:#8a7f5f; }
+
+  table{ width:100%; border-collapse:collapse; background:var(--washi-card); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  th, td{ padding:10px 12px; text-align:left; font-size:13.5px; border-bottom:1px solid var(--line); }
+  th{ background:var(--indigo-deep); color:var(--washi); font-weight:700; font-size:12.5px; }
+  tr:last-child td{ border-bottom:none; }
+  tr:hover td{ background:rgba(224,164,88,0.12); }
+  .student-group{ margin-bottom:28px; }
+  .student-name{
+    font-family:'Zen Maru Gothic',sans-serif; font-size:17px; color:var(--indigo-deep);
+    margin:0 0 8px; display:flex; align-items:center; gap:8px;
+  }
+  .student-name .count{
+    font-size:12px; background:var(--mustard); color:var(--indigo-deep); padding:2px 8px; border-radius:10px; font-weight:700;
+  }
+  .empty-msg{ text-align:center; color:#8a7f5f; padding:40px 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📊 だるま日本語 ・ 老師後台</h1>
+
+  <div class="login-box" id="loginBox">
+    <p>請輸入後台密碼</p>
+    <input type="password" id="passwordInput" placeholder="密碼">
+    <button id="loginBtn">登入</button>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <div class="toolbar">
+      <div class="stat-cards" id="statCards"></div>
+      <button id="refreshBtn">🔄 重新整理</button>
+    </div>
+    <div id="studentGroups"></div>
+  </div>
+</div>
+
+<script>
+let savedPassword = '';
+
+const loginBox = document.getElementById('loginBox');
+const dashboard = document.getElementById('dashboard');
+const passwordInput = document.getElementById('passwordInput');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+const refreshBtn = document.getElementById('refreshBtn');
+const statCards = document.getElementById('statCards');
+const studentGroups = document.getElementById('studentGroups');
+
+async function loadData(password){
+  const res = await fetch('/api/progress?password=' + encodeURIComponent(password));
+  const data = await res.json();
+  if(!res.ok){
+    throw new Error((data.error && data.error.message) || '讀取失敗');
+  }
+  return data.records || [];
+}
+
+function renderDashboard(records){
+  const studentCount = new Set(records.map(r=>r.student_name)).size;
+  const clearCount = records.length;
+  const lessonCount = new Set(records.map(r=>r.lesson_key)).size;
+
+  statCards.innerHTML = `
+    <div class="stat-card"><div class="num">${studentCount}</div><div class="label">學生人數</div></div>
+    <div class="stat-card"><div class="num">${clearCount}</div><div class="label">總通關次數</div></div>
+    <div class="stat-card"><div class="num">${lessonCount}</div><div class="label">涵蓋課程數</div></div>
+  `;
+
+  if(records.length === 0){
+    studentGroups.innerHTML = '<div class="empty-msg">目前還沒有任何學生通關紀錄</div>';
+    return;
+  }
+
+  const byStudent = {};
+  records.forEach(r=>{
+    if(!byStudent[r.student_name]) byStudent[r.student_name] = [];
+    byStudent[r.student_name].push(r);
+  });
+
+  let html = '';
+  Object.keys(byStudent).sort().forEach(name=>{
+    const rows = byStudent[name];
+    html += `<div class="student-group">
+      <div class="student-name">👤 ${escapeHtml(name)} <span class="count">${rows.length} 次通關</span></div>
+      <table>
+        <thead><tr><th>場景</th><th>課程</th><th>對話角色</th><th>分數</th><th>通關時間</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${escapeHtml(r.location_key)}</td>
+            <td>${escapeHtml(r.lesson_title || r.lesson_key)}</td>
+            <td>${escapeHtml(r.character_name || r.character_id || '-')}</td>
+            <td>${escapeHtml(String(r.score))}</td>
+            <td>${new Date(r.cleared_at).toLocaleString('zh-TW')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+  studentGroups.innerHTML = html;
+}
+
+function escapeHtml(s){
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function tryLogin(){
+  const pw = passwordInput.value.trim();
+  if(!pw) return;
+  loginError.textContent = '';
+  try{
+    const records = await loadData(pw);
+    savedPassword = pw;
+    loginBox.style.display = 'none';
+    dashboard.style.display = 'block';
+    renderDashboard(records);
+  }catch(e){
+    loginError.textContent = e.message;
+  }
+}
+
+loginBtn.addEventListener('click', tryLogin);
+passwordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tryLogin(); });
+
+refreshBtn.addEventListener('click', async ()=>{
+  try{
+    const records = await loadData(savedPassword);
+    renderDashboard(records);
+  }catch(e){
+    alert('重新整理失敗:' + e.message);
+  }
+});
+</script>
+</body>
+</html>
