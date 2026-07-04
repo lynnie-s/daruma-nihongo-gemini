@@ -92,6 +92,33 @@
   .pill-btn.active{background:var(--mustard); color:var(--indigo-deep); border-color:var(--mustard); font-weight:700;}
   .pill-btn:active{transform:scale(0.96);}
 
+  .speed-control{
+    display:flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(247,240,227,0.35);
+    border-radius:20px;
+    padding:4px 12px;
+    color:var(--washi);
+  }
+  .speed-icon{ font-size:13px; }
+  .speed-control input[type="range"]{
+    width:70px; height:4px; -webkit-appearance:none; appearance:none;
+    background:rgba(255,255,255,0.25); border-radius:2px; outline:none;
+  }
+  .speed-control input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:14px; height:14px; border-radius:50%;
+    background:var(--mustard); cursor:pointer; border:2px solid var(--indigo-deep);
+  }
+  .speed-control input[type="range"]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--mustard); cursor:pointer; border:2px solid var(--indigo-deep);
+  }
+  .speed-label{
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:11.5px; font-weight:700;
+    color:var(--mustard); min-width:32px;
+  }
+
   /* ---------- Daruma avatar ---------- */
   .avatar-wrap{
     display:flex; align-items:center; justify-content:center;
@@ -469,6 +496,12 @@
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
+      <div class="speed-control" title="読み上げ速度">
+        <span class="speed-icon">🐢</span>
+        <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
+        <span class="speed-icon">🐇</span>
+        <span class="speed-label" id="speedLabel">1.0x</span>
+      </div>
     </div>
   </header>
 
@@ -559,6 +592,8 @@ const emptyHint = document.getElementById('emptyHint');
 const appEl = document.getElementById('app');
 const furiganaToggle = document.getElementById('furiganaToggle');
 const voiceToggle = document.getElementById('voiceToggle');
+const speedSlider = document.getElementById('speedSlider');
+const speedLabel = document.getElementById('speedLabel');
 const resetBtn = document.getElementById('resetBtn');
 const sceneOpenBtn = document.getElementById('sceneOpenBtn');
 const sceneModalOverlay = document.getElementById('sceneModalOverlay');
@@ -586,6 +621,7 @@ if(window.location.protocol === 'file:'){
 let history = []; // {role:'user'|'assistant', text:'plain text'}
 let furiganaOn = true;
 let voiceOn = true;
+let voiceRateMultiplier = 1.0;
 let isProcessing = false;
 let currentScene = null;
 let currentSceneKey = '';
@@ -946,7 +982,7 @@ function speak(text){
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'ja-JP';
   const profile = (currentCharacter && currentCharacter.voiceProfile) ? currentCharacter.voiceProfile : DEFAULT_VOICE_PROFILE;
-  utter.rate = profile.rate;
+  utter.rate = Math.max(0.1, Math.min(10, profile.rate * voiceRateMultiplier));
   utter.pitch = profile.pitch;
   const voices = window.speechSynthesis.getVoices();
   const chosenVoice = pickVoiceForCharacter(voices, currentCharacter);
@@ -1101,6 +1137,10 @@ voiceToggle.addEventListener('click', ()=>{
   if(!voiceOn) window.speechSynthesis.cancel();
   voiceToggle.textContent = '音声 ' + (voiceOn ? 'ON' : 'OFF');
   voiceToggle.classList.toggle('active', voiceOn);
+});
+speedSlider.addEventListener('input', ()=>{
+  voiceRateMultiplier = parseFloat(speedSlider.value);
+  speedLabel.textContent = voiceRateMultiplier.toFixed(1) + 'x';
 });
 // ---------- Sound effects (synthesized, no audio files needed) ----------
 let audioCtx = null;
