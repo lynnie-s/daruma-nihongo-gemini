@@ -496,6 +496,7 @@
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
+      <button class="pill-btn" id="memeModeToggle">😎 ゆるだるま OFF</button>
       <div class="speed-control" title="読み上げ速度">
         <span class="speed-icon">🐢</span>
         <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
@@ -595,6 +596,7 @@ const voiceToggle = document.getElementById('voiceToggle');
 const speedSlider = document.getElementById('speedSlider');
 const speedLabel = document.getElementById('speedLabel');
 const resetBtn = document.getElementById('resetBtn');
+const memeModeToggle = document.getElementById('memeModeToggle');
 const sceneOpenBtn = document.getElementById('sceneOpenBtn');
 const sceneModalOverlay = document.getElementById('sceneModalOverlay');
 const sceneModalBody = document.getElementById('sceneModalBody');
@@ -631,6 +633,7 @@ let sceneScore = 0;
 let sceneCleared = false;
 let pendingLessonKey = '';
 let currentLevel = 'L2';
+let darumaMemeMode = false;
 
 const LEVEL_DEFS = {
   L1: {
@@ -774,15 +777,18 @@ LOCATIONS.forEach(loc=>{
 const SCENE_TARGET_SCORE = 5;
 
 function buildSystemPrompt(){
+  const memeDarumaPersona = `あなたは「だるまさん」ですが、今は「ゆるだるまモード」がオンになっています。この時のだるまさんは、ネットミームに詳しく、ヒッピーのようにゆるくてマイペース、どんな話題にも気軽についてこられる、ノリが軽くてめちゃくちゃ面白いキャラクターになります。一番好きな食べ物は「うまい棒」で、ことあるごとにその話をしたがる。口癖は「それな〜」「まあ、人生いろいろっしょ」。ボケとツッコミを交えた、笑える会話を心がけ、真面目すぎる返答は避ける。`;
+  const normalDarumaPersona = `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。`;
+
   const identity = currentCharacter
     ? `あなたは「${currentCharacter.name}」というキャラクターを演じるロールプレイの会話パートナーです。次の性格・話し方の特徴に必ず従ってください: ${currentCharacter.persona}`
-    : `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。`;
+    : (darumaMemeMode ? memeDarumaPersona : normalDarumaPersona);
 
   return `${identity}
 相手は台湾の中高生・大学生で、日本語を勉強中です。以下のルールを厳守してください。
 
 【安全に関する注意】
-どんなキャラクターを演じていても、恋愛的な内容・性的な話題・不適切な発言には絶対に触れないこと。常に健全で、友達思いで、教育的に適切な会話を保つこと。
+どんなキャラクターを演じていても、恋愛的な内容・性的な話題・不適切な発言には絶対に触れないこと。下品な言葉や実在の人物への誹謗中傷も避けること。常に健全で、友達思いで、教育的に適切な、笑える会話を保つこと。
 
 【レベル設定】
 ${LEVEL_DEFS[currentLevel].prompt}
@@ -1224,6 +1230,11 @@ voiceToggle.addEventListener('click', ()=>{
 speedSlider.addEventListener('input', ()=>{
   voiceRateMultiplier = parseFloat(speedSlider.value);
   speedLabel.textContent = voiceRateMultiplier.toFixed(1) + 'x';
+});
+memeModeToggle.addEventListener('click', ()=>{
+  darumaMemeMode = !darumaMemeMode;
+  memeModeToggle.textContent = '😎 ゆるだるま ' + (darumaMemeMode ? 'ON' : 'OFF');
+  memeModeToggle.classList.toggle('active', darumaMemeMode);
 });
 // ---------- Sound effects (synthesized, no audio files needed) ----------
 let audioCtx = null;
