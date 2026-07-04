@@ -340,6 +340,33 @@
     font-family:'Noto Sans TC',sans-serif; font-size:13.5px; font-weight:700;
   }
 
+  .scene-back-btn{
+    background:none; border:none; color:var(--indigo); cursor:pointer;
+    font-family:'Zen Kaku Gothic New',sans-serif; font-size:12.5px; font-weight:700;
+    padding:4px 0 10px; text-align:left;
+  }
+  .char-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .char-card{
+    background:var(--washi-dark);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 10px;
+    text-align:center;
+    cursor:pointer;
+    font-family:'Noto Sans TC',sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    transition:transform .1s ease, box-shadow .15s ease;
+  }
+  .char-card:hover{ box-shadow:var(--shadow); transform:translateY(-2px); }
+  .char-card:active{ transform:scale(0.97); }
+  .char-avatar{
+    width:64px; height:64px; object-fit:cover; object-position:top center;
+    border-radius:50%; border:2px solid var(--washi-card); box-shadow:0 2px 6px rgba(0,0,0,0.15);
+    background:var(--washi-card);
+  }
+  .char-name{ font-size:13px; font-weight:700; color:var(--ink); }
+  .char-tagline{ font-size:11px; color:#8a7f5f; line-height:1.4; }
+
   .typing-dots{ display:flex; gap:4px; padding:6px 4px; }
   .typing-dots span{
     width:6px; height:6px; border-radius:50%; background:var(--indigo); opacity:.4;
@@ -506,84 +533,108 @@ let voiceOn = true;
 let isProcessing = false;
 let currentScene = null;
 let currentSceneKey = '';
+let currentCharacter = null;
+let currentCharacterId = '';
 let sceneScore = 0;
 let sceneCleared = false;
+let pendingLessonKey = '';
 
-const SCENARIOS = {
-  school_intro: {
-    category: "🏫 学校",
-    title: "自己紹介",
-    difficulty: 1,
-    topic: "学校で新しいクラスメートに自己紹介する場面。名前、出身、趣味、好きな科目などを聞き出し、相手の答えに興味を持って自然に話を広げること。",
-    opening: [
-      {text:"こんにちは",reading:null,meaning:"你好"},{text:"!",reading:null,meaning:null},
-      {text:"今日",reading:"きょう",meaning:"今天"},{text:"から",reading:null,meaning:"從~開始"},{text:"同じ",reading:"おなじ",meaning:"相同的"},{text:"クラス",reading:null,meaning:"班級"},{text:"です",reading:null,meaning:"是(禮貌)"},{text:"ね",reading:null,meaning:"呢(尋求同意)"},{text:"。",reading:null,meaning:null},
-      {text:"自己紹介",reading:"じこしょうかい",meaning:"自我介紹"},{text:"してくれますか",reading:null,meaning:"可以幫我做~嗎"},{text:"?",reading:null,meaning:null}
-    ],
-    openingZh: "你好!今天開始是同班同學呢。可以自我介紹一下嗎?"
+const CHARACTERS = {
+  teacher: {
+    name: "先生",
+    image: "char-teacher.png",
+    tagline: "落ち着いた男性の先生",
+    persona: "落ち着いていて親切な男性の先生。丁寧語(です/ます)で話し、生徒を励ましながら教える。時々ちょっとした冗談も言うが、基本的に穏やかで頼れる大人の話し方。"
   },
-  school_break: {
-    category: "🏫 学校",
-    title: "休み時間の雑談",
-    difficulty: 2,
-    topic: "学校の休み時間の雑談。最近あった出来事や趣味の話題で気軽に話す。あまり堅苦しくならないようにする。",
-    opening: [
-      {text:"もうすぐ",reading:null,meaning:"快要、馬上"},{text:"休み時間",reading:"やすみじかん",meaning:"休息時間"},{text:"だね",reading:null,meaning:"對吧"},{text:"。",reading:null,meaning:null},
-      {text:"今",reading:"いま",meaning:"現在"},{text:"何か",reading:"なにか",meaning:"什麼事"},{text:"面白い",reading:"おもしろい",meaning:"有趣的"},{text:"こと",reading:null,meaning:"事情"},{text:"あった",reading:null,meaning:"有過(あるー過去式)"},{text:"?",reading:null,meaning:null}
-    ],
-    openingZh: "快到下課休息時間了呢,現在有什麼有趣的事嗎?"
+  gyaru: {
+    name: "ギャルの先輩",
+    image: "char-gyaru.png",
+    tagline: "明るくノリのいい先輩",
+    persona: "明るくテンションが高い、今どきのギャル系の先輩。タメ口でフレンドリー、「〜じゃん」「〜だし」「まじで」のようなカジュアルな話し方をする。前向きでノリがよく、後輩を気にかけている。下品な言葉は使わない。"
   },
-  school_class: {
-    category: "🏫 学校",
-    title: "授業について話す",
-    difficulty: 2,
-    topic: "授業の内容や感想について話す場面。得意科目・苦手科目、宿題、テストなどの話題を含めてよい。",
-    opening: [
-      {text:"今日",reading:"きょう",meaning:"今天"},{text:"の",reading:null,meaning:"的"},{text:"授業",reading:"じゅぎょう",meaning:"課程、上課"},{text:"、",reading:null,meaning:null},
-      {text:"どうだった",reading:null,meaning:"怎麼樣呢(過去式)"},{text:"?",reading:null,meaning:null},{text:"難しかった",reading:"むずかしかった",meaning:"(之前)很難"},{text:"?",reading:null,meaning:null}
-    ],
-    openingZh: "今天的課怎麼樣?難嗎?"
+  boy: {
+    name: "男子高校生",
+    image: "char-boy.png",
+    tagline: "人懐っこいクラスメート",
+    persona: "人懐っこく、ちょっとお調子者の男子高校生のクラスメート。タメ口混じりだが失礼にならない程度。フレンドリーで話しやすい雰囲気。"
   },
-  school_afterschool: {
-    category: "🏫 学校",
-    title: "放課後の約束",
-    difficulty: 3,
-    topic: "放課後の予定について話す場面。遊びに行く、部活、勉強など、具体的な提案や時間の約束をする練習をする。",
-    opening: [
-      {text:"放課後",reading:"ほうかご",meaning:"放學後"},{text:"、",reading:null,meaning:null},{text:"時間",reading:"じかん",meaning:"時間"},{text:"ある",reading:null,meaning:"有"},{text:"?",reading:null,meaning:null},
-      {text:"一緒に",reading:"いっしょに",meaning:"一起"},{text:"何か",reading:"なにか",meaning:"什麼"},{text:"しない",reading:null,meaning:"要不要做(邀約)"},{text:"?",reading:null,meaning:null}
-    ],
-    openingZh: "放學後有空嗎?要不要一起做點什麼?"
-  },
-  school_borrow: {
-    category: "🏫 学校",
-    title: "忘れ物・お願いする",
-    difficulty: 3,
-    topic: "忘れ物をしたときに物を貸してほしいとお願いする場面、および頼まれた側としての自然な返事の仕方を練習する。",
-    opening: [
-      {text:"あれ",reading:null,meaning:"咦(驚訝的感嘆詞)"},{text:"、",reading:null,meaning:null},{text:"消しゴム",reading:"けしゴム",meaning:"橡皮擦"},{text:"忘れちゃった",reading:"わすれちゃった",meaning:"忘記帶了(口語)"},{text:"。",reading:null,meaning:null},
-      {text:"貸してもらえる",reading:"かしてもらえる",meaning:"可以借我嗎"},{text:"?",reading:null,meaning:null}
-    ],
-    openingZh: "咦,我忘記帶橡皮擦了,可以借我嗎?"
+  girl: {
+    name: "女子高校生",
+    image: "char-girl.png",
+    tagline: "優しいクラスメート",
+    persona: "おっとりして優しい女子高校生のクラスメート。丁寧だが親しみやすい話し方で、時々可愛らしい言い回しを使う。聞き上手で相手の話に興味を持つ。"
   }
 };
+
+const LOCATIONS = [
+  {
+    key: "school",
+    label: "🏫 学校",
+    banner: "scene-banner-school.png",
+    lessons: [
+      { key:"school_intro", title:"自己紹介", difficulty:1, topic:"学校で新しいクラスメートに自己紹介する場面。名前、出身、趣味、好きな科目などを聞き出し、相手の答えに興味を持って自然に話を広げること。" },
+      { key:"school_break", title:"休み時間の雑談", difficulty:2, topic:"学校の休み時間の雑談。最近あった出来事や趣味の話題で気軽に話す。あまり堅苦しくならないようにする。" },
+      { key:"school_class", title:"授業について話す", difficulty:2, topic:"授業の内容や感想について話す場面。得意科目・苦手科目、宿題、テストなどの話題を含めてよい。" },
+      { key:"school_afterschool", title:"放課後の約束", difficulty:3, topic:"放課後の予定について話す場面。遊びに行く、部活、勉強など、具体的な提案や時間の約束をする練習をする。" },
+      { key:"school_borrow", title:"忘れ物・お願いする", difficulty:3, topic:"忘れ物をしたときに物を貸してほしいとお願いする場面、および頼まれた側としての自然な返事の仕方を練習する。" }
+    ]
+  },
+  {
+    key: "restaurant",
+    label: "🍽️ レストラン",
+    banner: "scene-banner-restaurant.png",
+    lessons: [
+      { key:"rest_reserve", title:"予約する", difficulty:1, topic:"レストランに電話や受付で予約を入れる場面。人数、日時、名前などを伝える練習。" },
+      { key:"rest_order", title:"メニューを選ぶ・注文する", difficulty:2, topic:"メニューを見ながら店員におすすめや内容を尋ね、注文する場面。" },
+      { key:"rest_request", title:"注文の変更・お願いをする", difficulty:2, topic:"アレルギーや苦手な食材を伝えたり、量の調整をお願いする場面。" },
+      { key:"rest_pay", title:"会計をする", difficulty:2, topic:"食事の後、会計をお願いしたり、割り勘について話す場面。" },
+      { key:"rest_feedback", title:"感想を話す", difficulty:3, topic:"食事の感想を伝え合う場面。味や雰囲気について自然に話す練習。" }
+    ]
+  },
+  {
+    key: "cafe",
+    label: "☕ カフェ",
+    banner: "scene-banner-cafe.png",
+    lessons: [
+      { key:"cafe_order", title:"飲み物を注文する", difficulty:1, topic:"カフェでドリンクを注文する場面。サイズやカスタマイズ(氷や甘さなど)を伝える練習。" },
+      { key:"cafe_meetup", title:"友達と待ち合わせ", difficulty:1, topic:"カフェで友達と待ち合わせをして、近況を話す場面。" },
+      { key:"cafe_seat", title:"席やWi-Fiについて聞く", difficulty:2, topic:"空いている席やWi-Fi、コンセントの有無について店員に尋ねる場面。" },
+      { key:"cafe_study", title:"勉強・作業の話", difficulty:2, topic:"カフェで勉強や作業をしながら、集中できるかどうかなど雑談する場面。" },
+      { key:"cafe_impression", title:"お店の感想を話す", difficulty:3, topic:"そのカフェの雰囲気や飲み物について感想を話し合う場面。" }
+    ]
+  }
+];
+
+const LESSON_LOOKUP = {};
+LOCATIONS.forEach(loc=>{
+  loc.lessons.forEach(lesson=>{
+    LESSON_LOOKUP[lesson.key] = { ...lesson, locationLabel: loc.label, locationKey: loc.key };
+  });
+});
 
 const SCENE_TARGET_SCORE = 5;
 
 function buildSystemPrompt(){
-  return `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。
-相手は台湾の大学生で、日本語を勉強中です。以下のルールを厳守してください。
+  const identity = currentCharacter
+    ? `あなたは「${currentCharacter.name}」というキャラクターを演じるロールプレイの会話パートナーです。次の性格・話し方の特徴に必ず従ってください: ${currentCharacter.persona}`
+    : `あなたは「だるまさん」という、台湾人の日本語学習者と話す、温かくて励まし上手な日本語の会話パートナーです。`;
+
+  return `${identity}
+相手は台湾の中高生・大学生で、日本語を勉強中です。以下のルールを厳守してください。
+
+【安全に関する注意】
+どんなキャラクターを演じていても、恋愛的な内容・性的な話題・不適切な発言には絶対に触れないこと。常に健全で、友達思いで、教育的に適切な会話を保つこと。
 
 【レベル設定】
 初級②相当:です/ます体中心、て形(〜てください/〜ています)、普通の過去形(〜ました/〜でした)、形容詞の活用、比較表現。語彙は「文化初級日本語」2〜3巻相当。
 ${currentScene ? `
 【シーン設定】
-これは「${currentScene.category} ・ ${currentScene.title}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
+これは「${currentScene.locationLabel} ・ ${currentScene.title}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
 話が大きく脱線した場合は、自然にこのテーマに話を戻すよう誘導すること。
 ` : ''}
 【会話の基本姿勢】
 - 相手の日本語に文法・語彙の間違いがあっても、まず言いたいことを推測して理解し、自然に会話を続けること。会話が止まらないようにする。
-- だるまさんらしく親しみやすく、時々励ましの言葉を交える。ただし説教くさくしない。
+- 自分のキャラクターらしく親しみやすく、時々励ましの言葉を交える。ただし説教くさくしない。
 - 返信は1〜3文程度、短く自然な会話文にする。長くなりすぎないこと。
 
 【出力形式】
@@ -604,11 +655,12 @@ ${currentScene ? `
 - 全文を、漢字を含む意味の塊ごとに分割すること。漢字を含む部分には対応する読み(ひらがな)をreadingに入れる。ひらがな・カタカナ・句読点のみの部分はreading を null にする。
 - 各要素の meaning には、その単語・表現の簡潔な繁體中文の意味を入れる(例:「食べます」→「吃(禮貌形)」)。「、」「。」「?」などの記号や意味を持たない断片は meaning を null にする。
 - 例: 「今日は暑いですね」→ [{"text":"今日","reading":"きょう","meaning":"今天"},{"text":"は","reading":null,"meaning":"表示主題的助詞"},{"text":"暑い","reading":"あつい","meaning":"熱的"},{"text":"です","reading":null,"meaning":"是(禮貌形)"},{"text":"ね","reading":null,"meaning":"呢(尋求同意的語氣詞)"}]
-- userSegments には、相手が今回送ってきた「元の文(修正前)」をそのまま同じルールで分割すること。文法が間違っていても直さずそのまま使う。
+- userSegments には、相手が今回送ってきた「元の文(修正前)」をそのまま同じルールで分割すること。文法が間違っていても直さずそのまま使う。もし相手のメッセージがシステム指示(丸括弧で始まる指示文など)の場合は、userSegments は空配列にしてよい。
 
 【correctionのルール】
 - 相手のメッセージに明らかな文法・語彙・助詞の誤りがあり、教える価値がある場合のみ needsCorrection を true にし、correctedSegments に自然な日本語に直した相手の文を入れる。些細な口語表現の違いなどは true にしない。
-- 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。`;
+- 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
+- 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
 }
 
 function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
@@ -695,13 +747,7 @@ function removeTyping(){
   if(el) el.remove();
 }
 
-async function callClaude(userText){
-  const msgs = [];
-  history.forEach(h=>{
-    msgs.push({role: h.role, content: h.text});
-  });
-  msgs.push({role:'user', content:userText});
-
+async function callClaudeMessages(msgs){
   let response;
   try{
     response = await fetch("/api/chat", {
@@ -745,6 +791,15 @@ async function callClaude(userText){
     };
   }
   return parsed;
+}
+
+async function callClaude(userText){
+  const msgs = [];
+  history.forEach(h=>{
+    msgs.push({role: h.role, content: h.text});
+  });
+  msgs.push({role:'user', content:userText});
+  return callClaudeMessages(msgs);
 }
 
 function speak(text){
@@ -955,8 +1010,8 @@ function playSceneChime(){
 }
 
 resetBtn.addEventListener('click', ()=>{
-  if(currentSceneKey){
-    startScene(currentSceneKey);
+  if(currentSceneKey && currentCharacterId){
+    startScene(currentSceneKey, currentCharacterId);
     return;
   }
   history = [];
@@ -966,22 +1021,15 @@ resetBtn.addEventListener('click', ()=>{
   window.speechSynthesis.cancel();
 });
 
-// ---------- Scenes ----------
+// ---------- Scenes: step 1 (lesson picker) ----------
 function renderSceneModal(){
-  const categories = {};
-  Object.keys(SCENARIOS).forEach(key=>{
-    const s = SCENARIOS[key];
-    if(!categories[s.category]) categories[s.category] = [];
-    categories[s.category].push({key, ...s});
-  });
-
   let html = `<button class="scene-free-card" id="sceneFreeCard">💬 自由会話(シーンなし)</button>`;
-  Object.keys(categories).forEach(cat=>{
-    html += `<div class="scene-cat-title">${escapeHtml(cat)}</div><div class="scene-grid">`;
-    categories[cat].forEach(item=>{
-      html += `<button class="scene-card" data-key="${item.key}">
+  LOCATIONS.forEach(loc=>{
+    html += `<div class="scene-cat-title">${escapeHtml(loc.label)}</div><div class="scene-grid">`;
+    loc.lessons.forEach(lesson=>{
+      html += `<button class="scene-card" data-key="${lesson.key}">
         <span class="scene-icon">📖</span>
-        <span class="scene-title">${escapeHtml(item.title)}</span>
+        <span class="scene-title">${escapeHtml(lesson.title)}</span>
       </button>`;
     });
     html += `</div>`;
@@ -990,13 +1038,42 @@ function renderSceneModal(){
 
   sceneModalBody.querySelectorAll('.scene-card').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      closeSceneModal();
-      startScene(btn.dataset.key);
+      pendingLessonKey = btn.dataset.key;
+      renderCharacterPicker();
     });
   });
   document.getElementById('sceneFreeCard').addEventListener('click', ()=>{
     closeSceneModal();
     exitScene();
+  });
+}
+
+// ---------- Scenes: step 2 (character picker) ----------
+function renderCharacterPicker(){
+  const lesson = LESSON_LOOKUP[pendingLessonKey];
+  if(!lesson) return;
+
+  let html = `<button class="scene-back-btn" id="sceneBackBtn">← 戻る</button>
+    <div class="scene-cat-title">${escapeHtml(lesson.locationLabel)} ・ ${escapeHtml(lesson.title)}</div>
+    <div class="scene-cat-title" style="margin-top:2px;">誰と話す?</div>
+    <div class="char-grid">`;
+  Object.keys(CHARACTERS).forEach(id=>{
+    const c = CHARACTERS[id];
+    html += `<button class="char-card" data-id="${id}">
+      <img class="char-avatar" src="${c.image}" alt="${escapeHtml(c.name)}" onerror="this.style.display='none'">
+      <span class="char-name">${escapeHtml(c.name)}</span>
+      <span class="char-tagline">${escapeHtml(c.tagline)}</span>
+    </button>`;
+  });
+  html += `</div>`;
+  sceneModalBody.innerHTML = html;
+
+  document.getElementById('sceneBackBtn').addEventListener('click', renderSceneModal);
+  sceneModalBody.querySelectorAll('.char-card').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      closeSceneModal();
+      startScene(pendingLessonKey, btn.dataset.id);
+    });
   });
 }
 
@@ -1008,27 +1085,48 @@ function closeSceneModal(){
   sceneModalOverlay.classList.remove('open');
 }
 
-function startScene(key){
-  const scene = SCENARIOS[key];
-  if(!scene) return;
-  currentScene = scene;
-  currentSceneKey = key;
+async function startScene(lessonKey, characterId){
+  const lesson = LESSON_LOOKUP[lessonKey];
+  const character = CHARACTERS[characterId];
+  if(!lesson || !character) return;
+
+  currentScene = lesson;
+  currentSceneKey = lessonKey;
+  currentCharacter = character;
+  currentCharacterId = characterId;
   sceneScore = 0;
   sceneCleared = false;
   history = [];
   chatEl.innerHTML='';
   window.speechSynthesis.cancel();
   sceneBanner.style.display = 'flex';
-  sceneBannerLabel.textContent = '📚 ' + scene.category + ' ・ ' + scene.title;
+  sceneBannerLabel.textContent = '📚 ' + lesson.locationLabel + ' ・ ' + lesson.title + ' ・ ' + character.name;
   updateSceneScoreLabel();
   emptyHint.style.display = 'none';
 
   playSceneChime();
+  addTyping();
+  statusCaption.textContent = 'シーンを準備しています…';
 
-  const plainOpening = scene.opening.map(s=>s.text).join('');
-  addAiMessage(scene.opening, scene.openingZh);
-  history.push({role:'assistant', text: plainOpening});
-  speak(plainOpening);
+  try{
+    const kickoffMsgs = [{
+      role:'user',
+      content:'(システム指示:これは会話の最初のターンです。上で指定されたキャラクターとシーン設定に沿って、あなたの方から自然に話しかけて会話を始めてください。ユーザーはまだ何も発言していません。userSegmentsは空配列にし、needsCorrectionはfalseにしてください。)'
+    }];
+    const result = await callClaudeMessages(kickoffMsgs);
+    removeTyping();
+    statusCaption.textContent = '';
+
+    const plainOpening = (result.reply || []).map(s=>s.text).join('');
+    addAiMessage(result.reply || [{text:'こんにちは!',reading:null}], result.replyZh);
+    history.push({role:'assistant', text: plainOpening});
+    speak(plainOpening);
+  }catch(e){
+    removeTyping();
+    statusCaption.textContent = '';
+    console.error('シーン開始エラー:', e);
+    addAiMessage([{text:'あれ、うまく始められなかったみたい。もう一度シーンを選んでみてね。',reading:null}], '抱歉,情境開場失敗了,請重新選擇一次試試看。');
+  }
 }
 
 function updateSceneScoreLabel(){
@@ -1037,7 +1135,7 @@ function updateSceneScoreLabel(){
 
 function showClearModal(){
   playSceneChime();
-  const harderExists = Object.values(SCENARIOS).some(s => s.difficulty > (currentScene ? currentScene.difficulty : 0));
+  const harderExists = Object.values(LESSON_LOOKUP).some(s => s.difficulty > (currentScene ? currentScene.difficulty : 0));
   clearModalText.textContent = harderExists
     ? 'このシーンのレッスンをクリアしたよ!もっと難しいシーンに挑戦する?それともこのまま話し続ける?'
     : 'このシーンのレッスンをクリアしたよ!すごいね!このまま自由に話し続けよう。';
@@ -1071,6 +1169,8 @@ document.addEventListener('click', (e)=>{
 function exitScene(){
   currentScene = null;
   currentSceneKey = '';
+  currentCharacter = null;
+  currentCharacterId = '';
   sceneScore = 0;
   sceneCleared = false;
   sceneBanner.style.display = 'none';
