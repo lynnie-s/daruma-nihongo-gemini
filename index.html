@@ -832,6 +832,15 @@ function needsFurigana(text){
   return containsKanji(text) || containsLatin(text);
 }
 
+function buildSpeechText(segments){
+  return (segments || []).map(seg=>{
+    if(isRealValue(seg.reading) && needsFurigana(seg.text) && seg.reading.trim() !== seg.text.trim()){
+      return seg.reading;
+    }
+    return seg.text;
+  }).join('');
+}
+
 function renderRuby(segments){
   return segments.map(seg=>{
     const hasReading = isRealValue(seg.reading)
@@ -866,7 +875,6 @@ function addUserMessage(text){
 function buildCorrectionCard(correction){
   const card = document.createElement('div');
   card.className='correction-card';
-  const plainCorrected = (correction.correctedSegments || []).map(s=>s.text).join('');
   card.innerHTML = `
     <div class="card-head">
       <div class="label">💡 正確な言い方</div>
@@ -877,7 +885,7 @@ function buildCorrectionCard(correction){
     <span class="corrected-jp">${renderRuby(correction.correctedSegments || [])}</span>
     ${correction.explanationZh ? `<div class="correction-explain">${escapeHtml(correction.explanationZh)}</div>` : ''}
   `;
-  card.querySelector('.speak-btn').addEventListener('click', ()=> speak(plainCorrected));
+  card.querySelector('.speak-btn').addEventListener('click', ()=> speak(buildSpeechText(correction.correctedSegments)));
   return card;
 }
 
@@ -1108,7 +1116,7 @@ async function handleSend(){
     history.push({role:'assistant', text: plainReply});
 
     statusCaption.textContent='';
-    speak(plainReply);
+    speak(buildSpeechText(result.reply));
   }catch(e){
     removeTyping();
     console.error('だるま日本語 API Error:', e);
@@ -1356,7 +1364,7 @@ async function startScene(lessonKey, characterId){
     const plainOpening = (result.reply || []).map(s=>s.text).join('');
     addAiMessage(result.reply || [{text:'こんにちは!',reading:null}], result.replyZh);
     history.push({role:'assistant', text: plainOpening});
-    speak(plainOpening);
+    speak(buildSpeechText(result.reply));
   }catch(e){
     removeTyping();
     statusCaption.textContent = '';
