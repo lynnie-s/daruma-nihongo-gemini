@@ -314,6 +314,47 @@
     padding:16px 18px 20px;
     overflow-y:auto;
   }
+
+  /* ---------- Level (proficiency) modal ---------- */
+  .level-modal-overlay{
+    display:none;
+    position:fixed; inset:0; z-index:55;
+    background:rgba(27,28,27,0.55);
+    align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .level-modal-overlay.open{ display:flex; }
+  .level-modal{
+    background:var(--washi-card);
+    border-radius:18px;
+    max-width:420px; width:100%;
+    max-height:80vh;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+  }
+  .level-modal-header{
+    position:relative;
+    background:var(--indigo-deep);
+    color:var(--washi);
+    padding:18px 20px;
+    flex-shrink:0;
+  }
+  .level-modal-header h2{
+    font-family:'Zen Maru Gothic',sans-serif; font-size:17px; margin:0; font-weight:700;
+  }
+  .level-modal-body{ padding:6px 20px 10px; overflow-y:auto; }
+  .level-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 4px; border-bottom:1px solid var(--line);
+    cursor:pointer; background:none; border-left:none; border-right:none; border-top:none;
+    width:100%; text-align:left; font-family:'Noto Sans TC',sans-serif;
+  }
+  .level-item:last-child{ border-bottom:none; }
+  .level-item .level-item-label{ font-size:14.5px; color:var(--ink); }
+  .level-item.selected .level-item-label{ color:var(--vermillion); font-weight:700; }
+  .level-item .level-check{ color:var(--vermillion); font-weight:900; font-size:16px; visibility:hidden; }
+  .level-item.selected .level-check{ visibility:visible; }
   .scene-cat-title{
     font-family:'Zen Kaku Gothic New',sans-serif; font-size:12px; font-weight:700;
     color:#8a7f5f; margin:14px 0 8px; text-transform:uppercase; letter-spacing:1px;
@@ -424,6 +465,7 @@
     </div>
     <div class="controls">
       <button class="pill-btn" id="sceneOpenBtn">📚 レッスンを選ぶ</button>
+      <button class="pill-btn" id="levelOpenBtn">📊 L2・初級</button>
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
@@ -458,6 +500,16 @@
         <button class="scene-modal-close" id="sceneModalClose">✕</button>
       </div>
       <div class="scene-modal-body" id="sceneModalBody"></div>
+    </div>
+  </div>
+
+  <div class="level-modal-overlay" id="levelModalOverlay">
+    <div class="level-modal">
+      <div class="level-modal-header">
+        <h2>更改熟練度級別</h2>
+        <button class="scene-modal-close" id="levelModalClose">✕</button>
+      </div>
+      <div class="level-modal-body" id="levelModalBody"></div>
     </div>
   </div>
 
@@ -512,6 +564,10 @@ const sceneOpenBtn = document.getElementById('sceneOpenBtn');
 const sceneModalOverlay = document.getElementById('sceneModalOverlay');
 const sceneModalBody = document.getElementById('sceneModalBody');
 const sceneModalClose = document.getElementById('sceneModalClose');
+const levelOpenBtn = document.getElementById('levelOpenBtn');
+const levelModalOverlay = document.getElementById('levelModalOverlay');
+const levelModalBody = document.getElementById('levelModalBody');
+const levelModalClose = document.getElementById('levelModalClose');
 const sceneBanner = document.getElementById('sceneBanner');
 const sceneBannerLabel = document.getElementById('sceneBannerLabel');
 const sceneScoreLabel = document.getElementById('sceneScoreLabel');
@@ -538,6 +594,35 @@ let currentCharacterId = '';
 let sceneScore = 0;
 let sceneCleared = false;
 let pendingLessonKey = '';
+let currentLevel = 'L2';
+
+const LEVEL_DEFS = {
+  L1: {
+    label: "L1 - 完全初學者",
+    shortLabel: "L1・初學者",
+    prompt: "完全初学者向け:挨拶、です/ます体の基本文型のみ使う。は/が/を/に/で などの基本助詞だけを使う。て形、過去形、形容詞の活用などはまだ使わない。語彙は「文化初級日本語」1課相当のごく基礎的なものに限る。一文はできるだけ短く、簡単にすること。"
+  },
+  L2: {
+    label: "L2 - 初級",
+    shortLabel: "L2・初級",
+    prompt: "初級レベル:です/ます体中心、て形(〜てください/〜ています)、普通の過去形(〜ました/〜でした)、形容詞の活用、比較表現を使う。語彙は「文化初級日本語」2〜3巻相当。"
+  },
+  L3: {
+    label: "L3 - 中級",
+    shortLabel: "L3・中級",
+    prompt: "中級レベル:可能形、条件形(〜ば/〜たら/〜と)、意向形、受身・使役の基本、やり取り表現(あげる/もらう/くれる)、簡単な敬語を含めてよい。JLPT N3程度の語彙・文法を使う。"
+  },
+  L4: {
+    label: "L4 - 高級",
+    shortLabel: "L4・高級",
+    prompt: "上級レベル:尊敬語・謙譲語などの敬語、複雑な接続表現、慣用句や自然な言い回しを積極的に使ってよい。JLPT N2程度の語彙・文法を使う。"
+  },
+  L5: {
+    label: "L5 - 母語者",
+    shortLabel: "L5・母語者",
+    prompt: "レベル制限なし。母語話者同士のような自然でスピード感のある日本語を使ってよい。スラングや口語表現、比喩表現も自由に使ってよい。"
+  }
+};
 
 const CHARACTERS = {
   teacher: {
@@ -641,7 +726,7 @@ function buildSystemPrompt(){
 どんなキャラクターを演じていても、恋愛的な内容・性的な話題・不適切な発言には絶対に触れないこと。常に健全で、友達思いで、教育的に適切な会話を保つこと。
 
 【レベル設定】
-初級②相当:です/ます体中心、て形(〜てください/〜ています)、普通の過去形(〜ました/〜でした)、形容詞の活用、比較表現。語彙は「文化初級日本語」2〜3巻相当。
+${LEVEL_DEFS[currentLevel].prompt}
 ${currentScene ? `
 【シーン設定】
 これは「${currentScene.locationLabel} ・ ${currentScene.title}」というテーマのロールプレイ会話です。次の状況設定に沿って会話を進めてください: ${currentScene.topic}
@@ -1238,6 +1323,39 @@ sceneModalOverlay.addEventListener('click', (e)=>{
   if(e.target === sceneModalOverlay) closeSceneModal();
 });
 sceneExitBtn.addEventListener('click', exitScene);
+
+// ---------- Level (proficiency) picker ----------
+function renderLevelModal(){
+  let html = '';
+  Object.keys(LEVEL_DEFS).forEach(key=>{
+    const def = LEVEL_DEFS[key];
+    const isSelected = key === currentLevel;
+    html += `<button class="level-item${isSelected ? ' selected' : ''}" data-level="${key}">
+      <span class="level-item-label">${escapeHtml(def.label)}</span>
+      <span class="level-check">✓</span>
+    </button>`;
+  });
+  levelModalBody.innerHTML = html;
+  levelModalBody.querySelectorAll('.level-item').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentLevel = btn.dataset.level;
+      levelOpenBtn.textContent = '📊 ' + LEVEL_DEFS[currentLevel].shortLabel;
+      closeLevelModal();
+    });
+  });
+}
+function openLevelModal(){
+  renderLevelModal();
+  levelModalOverlay.classList.add('open');
+}
+function closeLevelModal(){
+  levelModalOverlay.classList.remove('open');
+}
+levelOpenBtn.addEventListener('click', openLevelModal);
+levelModalClose.addEventListener('click', closeLevelModal);
+levelModalOverlay.addEventListener('click', (e)=>{
+  if(e.target === levelModalOverlay) closeLevelModal();
+});
 </script>
 </body>
 </html>
