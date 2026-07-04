@@ -9,11 +9,11 @@
 // 可用環境變數 GEMINI_MODEL(主要模型)與 GEMINI_MODEL_FALLBACKS(逗號分隔的備援清單)自訂。
 
 function getModelChain(){
-  const primary = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const primary = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
   const fallbacksEnv = process.env.GEMINI_MODEL_FALLBACKS;
   const fallbacks = fallbacksEnv
     ? fallbacksEnv.split(',').map(m => m.trim()).filter(Boolean)
-    : ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-pro'];
+    : ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'gemini-flash-latest'];
   // 去除重複,主要模型優先
   const chain = [primary, ...fallbacks].filter((m, i, arr) => arr.indexOf(m) === i);
   return chain;
