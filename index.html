@@ -670,12 +670,21 @@ ${currentCharacter.extraRule}
 
 function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
 
+function isRealValue(v){
+  if(v === null || v === undefined) return false;
+  const trimmed = String(v).trim();
+  if(trimmed === '') return false;
+  if(trimmed.toLowerCase() === 'null') return false;
+  return true;
+}
+
 function renderRuby(segments){
   return segments.map(seg=>{
-    const inner = (seg.reading && seg.reading.trim())
+    const hasReading = isRealValue(seg.reading);
+    const inner = hasReading
       ? `<ruby>${escapeHtml(seg.text)}<rt>${escapeHtml(seg.reading)}</rt></ruby>`
       : escapeHtml(seg.text);
-    if(seg.meaning && seg.meaning.trim()){
+    if(isRealValue(seg.meaning)){
       return `<span class="word-chip" data-meaning="${escapeHtml(seg.meaning)}">${inner}</span>`;
     }
     return inner;
