@@ -247,6 +247,11 @@
     padding:3px 10px; border-radius:12px; font-size:11.5px; font-weight:700;
     font-family:'Zen Kaku Gothic New',sans-serif;
   }
+  .score-rule-btn{
+    width:20px; height:20px; border-radius:50%; border:none;
+    background:rgba(27,44,71,0.14); color:var(--indigo-deep);
+    font-size:11px; font-weight:900; cursor:pointer; line-height:1;
+  }
 
   /* ---------- Word lookup popup ---------- */
   .word-chip{ cursor:pointer; border-bottom:1.5px dotted rgba(43,69,112,0.4); transition:background .1s ease; border-radius:3px; }
@@ -517,7 +522,24 @@
   <div class="scene-banner" id="sceneBanner" style="display:none;">
     <span class="scene-banner-label" id="sceneBannerLabel"></span>
     <span class="scene-score" id="sceneScoreLabel">🌟 0/5</span>
+    <button class="score-rule-btn" id="scoreRuleBtn" title="得点ルールを見る">❓</button>
     <button class="scene-exit-btn" id="sceneExitBtn">✕ シーン終了</button>
+  </div>
+
+  <div class="clear-modal-overlay" id="scoreRuleModalOverlay">
+    <div class="clear-modal">
+      <div class="clear-daruma">🌟</div>
+      <h2>得点ルール</h2>
+      <p style="text-align:left;">
+        ・文法が正しい日本語の文を送ると、1ポイントもらえるよ。<br><br>
+        ・「はい」「うん」「そうです」「いいえ」のような、単語一つだけの短い返事はポイントにならないよ(間違いではないから訂正は出ないけど、練習にはならないからね)。<br><br>
+        ・主語や動詞を含む、ちゃんとした文を作って送ってみよう!<br><br>
+        ・目標ポイントに到達したらクリア!
+      </p>
+      <div class="clear-modal-actions">
+        <button class="clear-btn clear-btn-primary" id="scoreRuleCloseBtn">わかった!</button>
+      </div>
+    </div>
   </div>
 
   <div class="clear-modal-overlay" id="nameModalOverlay">
@@ -628,6 +650,9 @@ const sceneBanner = document.getElementById('sceneBanner');
 const sceneBannerLabel = document.getElementById('sceneBannerLabel');
 const sceneScoreLabel = document.getElementById('sceneScoreLabel');
 const sceneExitBtn = document.getElementById('sceneExitBtn');
+const scoreRuleBtn = document.getElementById('scoreRuleBtn');
+const scoreRuleModalOverlay = document.getElementById('scoreRuleModalOverlay');
+const scoreRuleCloseBtn = document.getElementById('scoreRuleCloseBtn');
 const wordPopup = document.getElementById('wordPopup');
 const clearModalOverlay = document.getElementById('clearModalOverlay');
 const clearModalText = document.getElementById('clearModalText');
@@ -796,7 +821,10 @@ LOCATIONS.forEach(loc=>{
   });
 });
 
-const SCENE_TARGET_SCORE = 5;
+function getTargetScore(difficulty){
+  const d = difficulty || 1;
+  return Math.min(15, 5 + (d - 1) * 3);
+}
 
 function buildSystemPrompt(){
   const identity = currentCharacter
@@ -833,6 +861,7 @@ ${currentCharacter.extraRule}
   "reply": [ {"text":"漢字や仮名の一部分","reading":"その部分の読み(ひらがな)か、読み不要ならnull","meaning":"その部分の簡潔な繁體中文の意味(助詞や記号の場合はnull可)"}, ... ],
   "replyZh": "replyの繁體中文訳(簡潔に、1文)",
   "userSegments": [ {"text":"...","reading":"...","meaning":"..."} , ... ],
+  "substantial": true または false,
   "correction": {
     "needsCorrection": true または false,
     "correctedSegments": [ {"text":"...","reading":"...","meaning":"..."} , ... ],
@@ -848,6 +877,12 @@ ${currentCharacter.extraRule}
 - 例: 「今日はWi-Fiが使えますか」→ [{"text":"今日","reading":"きょう","meaning":"今天"},{"text":"は","reading":null,"meaning":"表示主題的助詞"},{"text":"Wi-Fi","reading":"ワイファイ","meaning":"無線網路"},{"text":"が","reading":null,"meaning":"表示主語的助詞"},{"text":"使えます","reading":"つかえます","meaning":"可以使用"},{"text":"か","reading":null,"meaning":"表示疑問的語氣詞"}]
 - 例(送り仮名の注意): 「彼は私より三つ上だよ」→ [{"text":"彼","reading":"かれ","meaning":"他"},{"text":"は","reading":null,"meaning":"表示主題的助詞"},{"text":"私","reading":"わたし","meaning":"我"},{"text":"より","reading":null,"meaning":"比~"},{"text":"三つ","reading":"みっつ","meaning":"三個/三歲"},{"text":"上","reading":"うえ","meaning":"年長、以上"},{"text":"だよ","reading":null,"meaning":"是喔(口語斷定)"}]
 - userSegments には、相手が今回送ってきた「元の文(修正前)」をそのまま同じルールで分割すること。文法が間違っていても直さずそのまま使う。もし相手のメッセージがシステム指示(丸括弧で始まる指示文など)の場合は、userSegments は空配列にしてよい。
+
+【substantialのルール(スコア加点の対象になるかどうかの判定、文法の正誤とは別の基準)】
+- 相手が今回送ってきたメッセージが、主語や動詞・形容詞などを含むそれなりの内容がある文の場合は substantial を true にする。
+- 「はい」「そうです」「うん」「いいえ」「うん、そう」のような、単語一つだけ・主語や動詞を含まない短い相槌や返事だけの場合は substantial を false にする。
+- これは文法的な誤りではないので、substantial が false でも needsCorrection は false のままでよい(訂正カードは出さない)。あくまで「練習として内容のある発話かどうか」の判定であり、間違いの指摘ではない。
+- システム指示(丸括弧で始まる指示文)への応答の場合、substantial は true にしてよい。
 
 【correctionのルール】
 - 相手のメッセージに明らかな文法・語彙・助詞の誤りがあり、教える価値がある場合のみ needsCorrection を true にし、correctedSegments に自然な日本語に直した相手の文を入れる。些細な口語表現の違いなどは true にしない。
@@ -1145,10 +1180,12 @@ async function handleSend(){
 
     if(currentScene && !sceneCleared){
       const wasCorrect = !(result.correction && result.correction.needsCorrection);
-      if(wasCorrect){
+      const isSubstantial = result.substantial !== false; // AI沒回傳這個欄位時,預設當作有效,避免誤判
+      if(wasCorrect && isSubstantial){
         sceneScore++;
         updateSceneScoreLabel();
-        if(sceneScore >= SCENE_TARGET_SCORE){
+        const target = getTargetScore(currentScene.difficulty);
+        if(sceneScore >= target){
           sceneCleared = true;
           setTimeout(showClearModal, 500);
           recordProgress();
@@ -1461,7 +1498,8 @@ async function startFreeChatWithCharacter(characterId){
 }
 
 function updateSceneScoreLabel(){
-  sceneScoreLabel.textContent = '🌟 ' + Math.min(sceneScore, SCENE_TARGET_SCORE) + '/' + SCENE_TARGET_SCORE;
+  const target = getTargetScore(currentScene ? currentScene.difficulty : 1);
+  sceneScoreLabel.textContent = '🌟 ' + Math.min(sceneScore, target) + '/' + target;
 }
 
 function showClearModal(){
@@ -1518,6 +1556,8 @@ sceneModalOverlay.addEventListener('click', (e)=>{
   if(e.target === sceneModalOverlay) closeSceneModal();
 });
 sceneExitBtn.addEventListener('click', exitScene);
+scoreRuleBtn.addEventListener('click', ()=> scoreRuleModalOverlay.classList.add('open'));
+scoreRuleCloseBtn.addEventListener('click', ()=> scoreRuleModalOverlay.classList.remove('open'));
 
 // ---------- Level (proficiency) picker ----------
 function renderLevelModal(){
