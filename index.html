@@ -1274,6 +1274,10 @@ resetBtn.addEventListener('click', ()=>{
     startScene(currentSceneKey, currentCharacterId);
     return;
   }
+  if(currentCharacterId && !currentSceneKey){
+    startFreeChatWithCharacter(currentCharacterId);
+    return;
+  }
   history = [];
   chatEl.innerHTML='';
   chatEl.appendChild(emptyHint);
@@ -1283,7 +1287,8 @@ resetBtn.addEventListener('click', ()=>{
 
 // ---------- Scenes: step 1 (lesson picker) ----------
 function renderSceneModal(){
-  let html = `<button class="scene-free-card" id="sceneFreeCard">💬 自由会話(シーンなし)</button>`;
+  let html = `<button class="scene-free-card" id="sceneFreeCard">💬 自由会話(シーンなし)</button>
+    <button class="scene-free-card" id="sceneFreeCharCard">🎭 好きなキャラと自由に話す(テーマなし)</button>`;
   LOCATIONS.forEach(loc=>{
     html += `<div class="scene-cat-title">${escapeHtml(loc.label)}</div><div class="scene-grid">`;
     loc.lessons.forEach(lesson=>{
@@ -1306,20 +1311,24 @@ function renderSceneModal(){
     closeSceneModal();
     exitScene();
   });
+  document.getElementById('sceneFreeCharCard').addEventListener('click', ()=>{
+    pendingLessonKey = '';
+    renderCharacterPicker();
+  });
 }
 
 // ---------- Scenes: step 2 (character picker) ----------
 function renderCharacterPicker(){
-  const lesson = LESSON_LOOKUP[pendingLessonKey];
-  if(!lesson) return;
+  const lesson = pendingLessonKey ? LESSON_LOOKUP[pendingLessonKey] : null;
+  if(pendingLessonKey && !lesson) return;
 
   let html = `<button class="scene-back-btn" id="sceneBackBtn">← 戻る</button>
-    <div class="scene-cat-title">${escapeHtml(lesson.locationLabel)} ・ ${escapeHtml(lesson.title)}</div>
+    <div class="scene-cat-title">${lesson ? escapeHtml(lesson.locationLabel) + ' ・ ' + escapeHtml(lesson.title) : '🎭 自由に話す(テーマなし)'}</div>
     <div class="scene-cat-title" style="margin-top:2px;">誰と話す?</div>
     <div class="char-grid">`;
   Object.keys(CHARACTERS).forEach(id=>{
     const c = CHARACTERS[id];
-    if(c.locations && !c.locations.includes(lesson.locationKey)) return;
+    if(lesson && c.locations && !c.locations.includes(lesson.locationKey)) return;
     html += `<button class="char-card" data-id="${id}">
       <img class="char-avatar" src="${c.image}" alt="${escapeHtml(c.name)}" onerror="this.style.display='none'">
       <span class="char-name">${escapeHtml(c.name)}</span>
@@ -1333,7 +1342,11 @@ function renderCharacterPicker(){
   sceneModalBody.querySelectorAll('.char-card').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       closeSceneModal();
-      startScene(pendingLessonKey, btn.dataset.id);
+      if(pendingLessonKey){
+        startScene(pendingLessonKey, btn.dataset.id);
+      }else{
+        startFreeChatWithCharacter(btn.dataset.id);
+      }
     });
   });
 }
@@ -1346,25 +1359,7 @@ function closeSceneModal(){
   sceneModalOverlay.classList.remove('open');
 }
 
-async function startScene(lessonKey, characterId){
-  const lesson = LESSON_LOOKUP[lessonKey];
-  const character = CHARACTERS[characterId];
-  if(!lesson || !character) return;
-
-  currentScene = lesson;
-  currentSceneKey = lessonKey;
-  currentCharacter = character;
-  currentCharacterId = characterId;
-  sceneScore = 0;
-  sceneCleared = false;
-  history = [];
-  chatEl.innerHTML='';
-  window.speechSynthesis.cancel();
-  sceneBanner.style.display = 'flex';
-  sceneBannerLabel.textContent = '📚 ' + lesson.locationLabel + ' ・ ' + lesson.title + ' ・ ' + character.name;
-  updateSceneScoreLabel();
-  emptyHint.style.display = 'none';
-
+async function runSceneKickoff(){
   playSceneChime();
   addTyping();
   statusCaption.textContent = 'シーンを準備しています…';
@@ -1391,6 +1386,50 @@ async function startScene(lessonKey, characterId){
       '除錯用的實際錯誤訊息(可以截圖給開發者看):' + (e.message || e)
     );
   }
+}
+
+async function startScene(lessonKey, characterId){
+  const lesson = LESSON_LOOKUP[lessonKey];
+  const character = CHARACTERS[characterId];
+  if(!lesson || !character) return;
+
+  currentScene = lesson;
+  currentSceneKey = lessonKey;
+  currentCharacter = character;
+  currentCharacterId = characterId;
+  sceneScore = 0;
+  sceneCleared = false;
+  history = [];
+  chatEl.innerHTML='';
+  window.speechSynthesis.cancel();
+  sceneBanner.style.display = 'flex';
+  sceneScoreLabel.style.display = 'inline-block';
+  sceneBannerLabel.textContent = '📚 ' + lesson.locationLabel + ' ・ ' + lesson.title + ' ・ ' + character.name;
+  updateSceneScoreLabel();
+  emptyHint.style.display = 'none';
+
+  await runSceneKickoff();
+}
+
+async function startFreeChatWithCharacter(characterId){
+  const character = CHARACTERS[characterId];
+  if(!character) return;
+
+  currentScene = null;
+  currentSceneKey = '';
+  currentCharacter = character;
+  currentCharacterId = characterId;
+  sceneScore = 0;
+  sceneCleared = false;
+  history = [];
+  chatEl.innerHTML='';
+  window.speechSynthesis.cancel();
+  sceneBanner.style.display = 'flex';
+  sceneScoreLabel.style.display = 'none';
+  sceneBannerLabel.textContent = '🎭 フリートーク ・ ' + character.name;
+  emptyHint.style.display = 'none';
+
+  await runSceneKickoff();
 }
 
 function updateSceneScoreLabel(){
