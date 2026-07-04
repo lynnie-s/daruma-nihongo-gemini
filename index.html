@@ -777,9 +777,15 @@ function isRealValue(v){
   return true;
 }
 
+function containsKanji(text){
+  return /[\u4e00-\u9fff]/.test(text || '');
+}
+
 function renderRuby(segments){
   return segments.map(seg=>{
-    const hasReading = isRealValue(seg.reading);
+    const hasReading = isRealValue(seg.reading)
+      && containsKanji(seg.text)
+      && seg.reading.trim() !== seg.text.trim();
     const inner = hasReading
       ? `<ruby>${escapeHtml(seg.text)}<rt>${escapeHtml(seg.reading)}</rt></ruby>`
       : escapeHtml(seg.text);
