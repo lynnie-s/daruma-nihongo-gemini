@@ -886,10 +886,15 @@ ${currentCharacter.extraRule}
 - これは文法的な誤りではないので、substantial が false でも needsCorrection は false のままでよい(訂正カードは出さない)。あくまで「練習として内容のある発話かどうか」の判定であり、間違いの指摘ではない。
 - システム指示(丸括弧で始まる指示文)への応答の場合、substantial は true にしてよい。
 
-【correctionのルール】
-- 相手のメッセージに明らかな文法・語彙・助詞の誤りがあり、教える価値がある場合のみ needsCorrection を true にし、correctedSegments に自然な日本語に直した相手の文を入れる。些細な口語表現の違いなどは true にしない。
-- 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
-- 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
+【correctionのルール(専門的な日本語教師として判定すること)】
+あなたはこの訂正判定において、日本語教育の専門家(プロの日本語教師・言語学者)として振る舞ってください。以下の観点を必ず考慮すること:
+
+1. **文脈を必ず考慮する**:相手の文だけを単独で見て判定するのではなく、これまでの会話の流れ(直前の質問、話題、時制、話し相手との関係性)を踏まえて、その文脈において自然かどうか、意味が正しく伝わるかどうかを判断すること。例えば、直前の質問が過去形なら答えも時制が一致しているか、シーン設定や相手との関係(敬語が必要な相手かどうかなど)に合っているかを見ること。
+2. **本当の誤りを正確に見抜く**:助詞の誤用(は/が、に/で、を/がなど)、動詞の活用ミス、自動詞・他動詞の混同、時制の不一致、語順の誤り、不自然な語彙選択、意味が変わってしまう誤りなど、教える価値のある明らかな誤りは見逃さず指摘すること。台湾人日本語学習者によくある誤りのパターン(中国語からの直訳による不自然さ、助詞の脱落、「〜は〜です」の過剰使用など)にも注意すること。
+3. **過剰訂正はしない**:文法的に許容される口語表現、話し言葉特有の省略、キャラクターの個性に合った砕けた言い回しは誤りとして扱わないこと。「正しいけど硬い」文を「もっと自然な」文に変える程度の些細な言い換えは行わない。
+4. **needsCorrection を true にするのは、実際に文法・語彙・助詞の誤りがあり、指摘することが学習者のためになる場合のみ**。判断に迷う場合は false にする(過剰な訂正よりも、会話の流れを優先する)。
+5. 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
+6. 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
 }
 
 function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
@@ -1121,15 +1126,43 @@ async function speakWithElevenLabs(text, voiceId){
   }
 }
 
-function speakWithBrowserVoice(text){
+function waitForVoices(){
+  return new Promise((resolve)=>{
+    const existing = window.speechSynthesis.getVoices();
+    if(existing && existing.length > 0){
+      resolve(existing);
+      return;
+    }
+    let resolved = false;
+    const onVoicesChanged = ()=>{
+      if(resolved) return;
+      const voices = window.speechSynthesis.getVoices();
+      if(voices && voices.length > 0){
+        resolved = true;
+        window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+        resolve(voices);
+      }
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+    // 保險:1.5秒後不管有沒有載入完成都繼續,避免卡住不講話
+    setTimeout(()=>{
+      if(resolved) return;
+      resolved = true;
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+      resolve(window.speechSynthesis.getVoices());
+    }, 1500);
+  });
+}
+
+async function speakWithBrowserVoice(text){
   if(!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
+  const voices = await waitForVoices();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'ja-JP';
   const profile = (currentCharacter && currentCharacter.voiceProfile) ? currentCharacter.voiceProfile : DEFAULT_VOICE_PROFILE;
   utter.rate = Math.max(0.1, Math.min(10, profile.rate * voiceRateMultiplier));
   utter.pitch = profile.pitch;
-  const voices = window.speechSynthesis.getVoices();
   const chosenVoice = pickVoiceForCharacter(voices, currentCharacter);
   if(chosenVoice) utter.voice = chosenVoice;
   daruma.classList.add('speaking');
@@ -1147,6 +1180,7 @@ function speakWithBrowserVoice(text){
 // preload voices (some browsers need this)
 if('speechSynthesis' in window){
   window.speechSynthesis.onvoiceschanged = ()=> window.speechSynthesis.getVoices();
+  window.speechSynthesis.getVoices();
 }
 
 async function handleSend(){
