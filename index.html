@@ -1333,6 +1333,24 @@ function getAudioCtx(){
   }
   return audioCtx;
 }
+
+// 一開始畫面被點擊/觸碰時,偷偷「解鎖」語音系統,避免第一次AI講話因瀏覽器安全機制而沒聲音
+function unlockAudioOnce(){
+  if('speechSynthesis' in window){
+    const primer = new SpeechSynthesisUtterance('');
+    primer.volume = 0;
+    window.speechSynthesis.speak(primer);
+  }
+  const ctx = getAudioCtx();
+  if(ctx && ctx.state === 'suspended'){
+    ctx.resume();
+  }
+  document.removeEventListener('click', unlockAudioOnce);
+  document.removeEventListener('touchstart', unlockAudioOnce);
+}
+document.addEventListener('click', unlockAudioOnce, { once:true });
+document.addEventListener('touchstart', unlockAudioOnce, { once:true });
+
 function playTone(freq, startTime, duration, gainPeak){
   const ctx = getAudioCtx();
   if(!ctx) return;
