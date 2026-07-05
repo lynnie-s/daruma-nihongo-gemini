@@ -1154,17 +1154,17 @@ function waitForVoices(){
   });
 }
 
-async function speakWithBrowserVoice(text){
+async function speakWithBrowserVoice(text, isRetry){
   if(!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const voices = await waitForVoices();
+  await waitForVoices();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'ja-JP';
   const profile = (currentCharacter && currentCharacter.voiceProfile) ? currentCharacter.voiceProfile : DEFAULT_VOICE_PROFILE;
   utter.rate = Math.max(0.1, Math.min(10, profile.rate * voiceRateMultiplier));
   utter.pitch = profile.pitch;
-  const chosenVoice = pickVoiceForCharacter(voices, currentCharacter);
-  if(chosenVoice) utter.voice = chosenVoice;
+  // 特定の語音オブジェクトを指定すると、たまに参照が無効になって無音になることがあるため、
+  // 明示的な voice 指定はせず、lang + pitch/rate だけでキャラクターの声を演出する。
   daruma.classList.add('speaking');
   statusCaption.textContent = '話しています…';
   utter.onend = ()=>{
@@ -1174,6 +1174,12 @@ async function speakWithBrowserVoice(text){
   utter.onerror = ()=>{
     daruma.classList.remove('speaking');
     statusCaption.textContent='';
+    // 一度だけ、シンプルな設定(lang指定のみ)で再試行する
+    if(!isRetry){
+      const plainUtter = new SpeechSynthesisUtterance(text);
+      plainUtter.lang = 'ja-JP';
+      window.speechSynthesis.speak(plainUtter);
+    }
   };
   window.speechSynthesis.speak(utter);
 }
