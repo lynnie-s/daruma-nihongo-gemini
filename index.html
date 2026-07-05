@@ -1227,99 +1227,43 @@ function autoResize(){
 }
 textInput.addEventListener('input', autoResize);
 
-// ---------- Voice input (錄音送給 Gemini 辨識,結果顯示在輸入框讓使用者確認) ----------
-let mediaRecorder = null;
-let recordedChunks = [];
-let mediaStream = null;
+// ---------- Voice input ----------
+let recognition = null;
 let recognizing = false;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(SR){
+  recognition = new SR();
+  recognition.lang = 'ja-JP';
+  recognition.interimResults = true;
+  recognition.continuous = false;
 
-function blobToBase64(blob){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onloadend = ()=>{
-      const dataUrl = reader.result;
-      const base64 = dataUrl.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function startRecording(){
-  try{
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  }catch(e){
-    statusCaption.textContent = 'マイクの使用が許可されていません';
-    setTimeout(()=> statusCaption.textContent='', 2500);
-    return;
-  }
-  recordedChunks = [];
-  const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? { mimeType: 'audio/webm;codecs=opus' }
-    : (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? { mimeType: 'audio/ogg;codecs=opus' } : {});
-  mediaRecorder = new MediaRecorder(mediaStream, options);
-  mediaRecorder.ondataavailable = (e)=>{
-    if(e.data && e.data.size > 0) recordedChunks.push(e.data);
+  recognition.onstart = ()=>{
+    recognizing = true;
+    micBtn.classList.add('recording');
+    statusCaption.textContent = '聞いています…';
   };
-  mediaRecorder.onstop = handleRecordingStop;
-  mediaRecorder.start();
-  recognizing = true;
-  micBtn.classList.add('recording');
-  statusCaption.textContent = '聞いています…';
-}
-
-function stopRecording(){
-  if(mediaRecorder && mediaRecorder.state !== 'inactive'){
-    mediaRecorder.stop();
-  }
-  if(mediaStream){
-    mediaStream.getTracks().forEach(t => t.stop());
-  }
-  recognizing = false;
-  micBtn.classList.remove('recording');
-}
-
-async function handleRecordingStop(){
-  statusCaption.textContent = '認識しています…';
-  try{
-    const mimeType = mediaRecorder.mimeType || 'audio/webm';
-    const blob = new Blob(recordedChunks, { type: mimeType });
-    if(blob.size < 500){
-      // ほぼ無音・録音失敗
-      statusCaption.textContent = '';
-      return;
+  recognition.onresult = (e)=>{
+    let transcript = '';
+    for(let i=0;i<e.results.length;i++){
+      transcript += e.results[i][0].transcript;
     }
-    const audioBase64 = await blobToBase64(blob);
-    const res = await fetch('/api/transcribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audioBase64, mimeType })
-    });
-    const data = await res.json();
-    statusCaption.textContent = '';
-    if(!res.ok){
-      throw new Error((data.error && data.error.message) || 'transcribe failed');
-    }
-    if(data.text){
-      textInput.value = (textInput.value ? textInput.value + ' ' : '') + data.text;
-      autoResize();
-      textInput.focus();
-    }
-  }catch(e){
-    console.error('音声認識エラー:', e);
-    statusCaption.textContent = '認識できなかったみたい。もう一度試してみてね';
-    setTimeout(()=> statusCaption.textContent='', 2500);
-  }
-}
-
-if(navigator.mediaDevices && window.MediaRecorder){
+    textInput.value = transcript;
+    autoResize();
+  };
+  recognition.onerror = ()=>{
+    statusCaption.textContent='';
+  };
+  recognition.onend = ()=>{
+    recognizing = false;
+    micBtn.classList.remove('recording');
+    statusCaption.textContent='';
+  };
   micBtn.addEventListener('click', ()=>{
     if(recognizing){
-      stopRecording();
+      recognition.stop();
     }else{
       window.speechSynthesis.cancel();
-      startRecording();
+      recognition.start();
     }
   });
 }else{
