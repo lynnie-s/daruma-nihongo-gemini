@@ -34,6 +34,17 @@
     padding:10px 18px; font-size:14px; font-weight:700; cursor:pointer;
   }
   .login-box button:hover, .toolbar button:hover{ background:var(--indigo-deep); }
+  .danger-btn{ background:var(--vermillion) !important; }
+  .danger-btn:hover{ background:#9c350b !important; }
+  .row-delete-btn{
+    background:none; border:1px solid var(--vermillion); color:var(--vermillion);
+    border-radius:8px; padding:3px 9px; font-size:11.5px; cursor:pointer;
+  }
+  .row-delete-btn:hover{ background:var(--vermillion); color:#fff; }
+  .student-delete-btn{
+    background:none; border:none; color:var(--vermillion); cursor:pointer;
+    font-size:12px; text-decoration:underline; margin-left:auto;
+  }
   .error-msg{ color:var(--vermillion); font-size:13px; margin-top:8px; }
 
   .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
@@ -75,7 +86,10 @@
   <div id="dashboard" style="display:none;">
     <div class="toolbar">
       <div class="stat-cards" id="statCards"></div>
-      <button id="refreshBtn">🔄 重新整理</button>
+      <div style="display:flex; gap:10px;">
+        <button id="refreshBtn">🔄 重新整理</button>
+        <button id="deleteAllBtn" class="danger-btn">🗑️ 清空全部紀錄</button>
+      </div>
     </div>
     <div id="studentGroups"></div>
   </div>
@@ -90,6 +104,7 @@ const passwordInput = document.getElementById('passwordInput');
 const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
 const refreshBtn = document.getElementById('refreshBtn');
+const deleteAllBtn = document.getElementById('deleteAllBtn');
 const statCards = document.getElementById('statCards');
 const studentGroups = document.getElementById('studentGroups');
 
@@ -100,6 +115,23 @@ async function loadData(password){
     throw new Error((data.error && data.error.message) || '讀取失敗');
   }
   return data.records || [];
+}
+
+async function deleteRecords(body){
+  const res = await fetch('/api/progress', {
+    method:'DELETE',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ password: savedPassword, ...body })
+  });
+  const data = await res.json();
+  if(!res.ok){
+    throw new Error((data.error && data.error.message) || '刪除失敗');
+  }
+}
+
+async function refreshDashboard(){
+  const records = await loadData(savedPassword);
+  renderDashboard(records);
 }
 
 function renderDashboard(records){
@@ -128,9 +160,11 @@ function renderDashboard(records){
   Object.keys(byStudent).sort().forEach(name=>{
     const rows = byStudent[name];
     html += `<div class="student-group">
-      <div class="student-name">👤 ${escapeHtml(name)} <span class="count">${rows.length} 次通關</span></div>
+      <div class="student-name">👤 ${escapeHtml(name)} <span class="count">${rows.length} 次通關</span>
+        <button class="student-delete-btn" data-student="${escapeHtml(name)}">刪除此人全部紀錄</button>
+      </div>
       <table>
-        <thead><tr><th>場景</th><th>課程</th><th>對話角色</th><th>分數</th><th>通關時間</th></tr></thead>
+        <thead><tr><th>場景</th><th>課程</th><th>對話角色</th><th>分數</th><th>通關時間</th><th></th></tr></thead>
         <tbody>
           ${rows.map(r=>`<tr>
             <td>${escapeHtml(r.location_key)}</td>
@@ -138,12 +172,36 @@ function renderDashboard(records){
             <td>${escapeHtml(r.character_name || r.character_id || '-')}</td>
             <td>${escapeHtml(String(r.score))}</td>
             <td>${new Date(r.cleared_at).toLocaleString('zh-TW')}</td>
+            <td><button class="row-delete-btn" data-id="${escapeHtml(String(r.id))}">刪除</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>`;
   });
   studentGroups.innerHTML = html;
+
+  studentGroups.querySelectorAll('.row-delete-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('確定要刪除這一筆通關紀錄嗎?')) return;
+      try{
+        await deleteRecords({ id: btn.dataset.id });
+        await refreshDashboard();
+      }catch(e){
+        alert('刪除失敗:' + e.message);
+      }
+    });
+  });
+  studentGroups.querySelectorAll('.student-delete-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm(`確定要刪除「${btn.dataset.student}」的全部通關紀錄嗎?這無法復原。`)) return;
+      try{
+        await deleteRecords({ studentName: btn.dataset.student });
+        await refreshDashboard();
+      }catch(e){
+        alert('刪除失敗:' + e.message);
+      }
+    });
+  });
 }
 
 function escapeHtml(s){
@@ -170,10 +228,20 @@ passwordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tryLogin(
 
 refreshBtn.addEventListener('click', async ()=>{
   try{
-    const records = await loadData(savedPassword);
-    renderDashboard(records);
+    await refreshDashboard();
   }catch(e){
     alert('重新整理失敗:' + e.message);
+  }
+});
+
+deleteAllBtn.addEventListener('click', async ()=>{
+  if(!confirm('確定要清空「全部」學生的通關紀錄嗎?這個動作無法復原!')) return;
+  if(!confirm('再次確認:真的要刪除所有資料嗎?')) return;
+  try{
+    await deleteRecords({ all: true });
+    await refreshDashboard();
+  }catch(e){
+    alert('刪除失敗:' + e.message);
   }
 });
 </script>

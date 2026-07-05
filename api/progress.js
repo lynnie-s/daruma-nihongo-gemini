@@ -1,5 +1,5 @@
 // Vercel Serverless Function
-// 負責把學生的通關紀錄存進 Supabase,以及讓老師後台讀取全部紀錄。
+// 負責把學生的通關紀錄存進 Supabase,以及讓老師後台讀取/刪除紀錄。
 //
 // 環境變數:
 // - SUPABASE_URL:你的 Supabase 專案網址(例如 https://xxxx.supabase.co)
@@ -8,6 +8,7 @@
 //
 // POST:學生通關時,前端呼叫這個記錄一筆資料(不需要密碼)
 // GET:老師後台讀取全部紀錄(需要在 query string 帶 ?password=xxx)
+// DELETE:老師後台刪除紀錄(需要密碼)。body 帶 { id } 刪單筆,或 { studentName } 刪該學生全部紀錄,或 { all: true } 清空全部
 
 export default async function handler(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -85,6 +86,49 @@ export default async function handler(req, res) {
 
       const data = await listRes.json();
       res.status(200).json({ records: data });
+    } catch (err) {
+      res.status(500).json({ error: { message: 'Server error: ' + err.message } });
+    }
+    return;
+  }
+
+  if (req.method === 'DELETE') {
+    const { password, id, studentName, all } = req.body || {};
+    if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+      res.status(401).json({ error: { message: '密碼錯誤。' } });
+      return;
+    }
+
+    let filterQuery = '';
+    if (all) {
+      // 刪除全部紀錄:用一個永遠成立的條件(id 大於 0)
+      filterQuery = 'id=gt.0';
+    } else if (id) {
+      filterQuery = `id=eq.${encodeURIComponent(id)}`;
+    } else if (studentName) {
+      filterQuery = `student_name=eq.${encodeURIComponent(studentName)}`;
+    } else {
+      res.status(400).json({ error: { message: '請提供 id、studentName 或 all 其中一項。' } });
+      return;
+    }
+
+    try {
+      const delRes = await fetch(`${SUPABASE_URL}/rest/v1/progress?${filterQuery}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'Prefer': 'return=minimal'
+        }
+      });
+
+      if (!delRes.ok) {
+        const errText = await delRes.text();
+        res.status(delRes.status).json({ error: { message: 'Supabase delete error: ' + errText.slice(0, 300) } });
+        return;
+      }
+
+      res.status(200).json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: { message: 'Server error: ' + err.message } });
     }
