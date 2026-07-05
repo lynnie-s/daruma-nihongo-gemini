@@ -510,6 +510,7 @@
       <button class="pill-btn active" id="furiganaToggle">振り仮名 ON</button>
       <button class="pill-btn active" id="voiceToggle">音声 ON</button>
       <button class="pill-btn" id="resetBtn">会話をリセット</button>
+      <button class="pill-btn" id="exportBtn">💾 会話を保存</button>
       <div class="speed-control" title="読み上げ速度">
         <span class="speed-icon">🐢</span>
         <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
@@ -638,6 +639,7 @@ const voiceToggle = document.getElementById('voiceToggle');
 const speedSlider = document.getElementById('speedSlider');
 const speedLabel = document.getElementById('speedLabel');
 const resetBtn = document.getElementById('resetBtn');
+const exportBtn = document.getElementById('exportBtn');
 const sceneOpenBtn = document.getElementById('sceneOpenBtn');
 const sceneModalOverlay = document.getElementById('sceneModalOverlay');
 const sceneModalBody = document.getElementById('sceneModalBody');
@@ -1348,6 +1350,61 @@ resetBtn.addEventListener('click', ()=>{
   chatEl.appendChild(emptyHint);
   emptyHint.style.display='block';
   window.speechSynthesis.cancel();
+});
+
+function extractPlainText(el){
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll('rt').forEach(rt=>rt.remove());
+  return clone.textContent.replace(/\s+/g,' ').trim();
+}
+
+exportBtn.addEventListener('click', ()=>{
+  const lines = [];
+  lines.push('だるま日本語 ・ 会話記録');
+  lines.push('日時: ' + new Date().toLocaleString('zh-TW'));
+  const studentName = getStudentName();
+  if(studentName) lines.push('名前: ' + studentName);
+  if(currentScene){
+    lines.push('シーン: ' + currentScene.locationLabel + ' ・ ' + currentScene.title);
+  }
+  if(currentCharacter){
+    lines.push('相手: ' + currentCharacter.name);
+  }
+  lines.push('----------------------------------------');
+  lines.push('');
+
+  Array.from(chatEl.children).forEach(node=>{
+    if(node.id === 'emptyHint' || node.id === 'typingIndicator') return;
+
+    if(node.classList.contains('msg') && node.classList.contains('user')){
+      const bubble = node.querySelector('.bubble');
+      if(bubble) lines.push('🧑 あなた: ' + extractPlainText(bubble));
+    } else if(node.classList.contains('msg') && node.classList.contains('ai')){
+      const bubble = node.querySelector('.bubble');
+      const zh = node.querySelector('.zh-caption');
+      const speaker = currentCharacter ? currentCharacter.name : 'だるま';
+      if(bubble) lines.push('🎎 ' + speaker + ': ' + extractPlainText(bubble));
+      if(zh) lines.push('   譯: ' + zh.textContent.trim());
+      lines.push('');
+    } else if(node.classList.contains('correction-card')){
+      const correctedJp = node.querySelector('.corrected-jp');
+      const explain = node.querySelector('.correction-explain');
+      if(correctedJp) lines.push('💡 正確な言い方: ' + extractPlainText(correctedJp));
+      if(explain) lines.push('   説明: ' + explain.textContent.trim());
+      lines.push('');
+    }
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `daruma-conversation-${dateStr}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 // ---------- Scenes: step 1 (lesson picker) ----------
