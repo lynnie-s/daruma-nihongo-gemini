@@ -29,7 +29,7 @@ function getModelChain(){
   const fallbacksEnv = process.env.GEMINI_MODEL_FALLBACKS;
   const fallbacks = fallbacksEnv
     ? fallbacksEnv.split(',').map(m => m.trim()).filter(Boolean)
-    : ['gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemma-4-26b-a4b-it', 'gemma-4-31b-it'];
+    : ['gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
   // 去除重複,主要模型優先
   const chain = [primary, ...fallbacks].filter((m, i, arr) => arr.indexOf(m) === i);
   return chain;
