@@ -935,7 +935,7 @@ function renderRuby(segments){
       ? `<ruby>${escapeHtml(seg.text)}<rt>${escapeHtml(seg.reading)}</rt></ruby>`
       : escapeHtml(seg.text);
     if(isRealValue(seg.meaning)){
-      return `<span class="word-chip" data-meaning="${escapeHtml(seg.meaning)}">${inner}</span>`;
+      return `<span class="word-chip" data-meaning="${escapeHtml(seg.meaning)}" data-speak="${escapeHtml(seg.text)}">${inner}</span>`;
     }
     return inner;
   }).join('');
@@ -1644,6 +1644,9 @@ document.addEventListener('click', (e)=>{
     wordPopup.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 160)) + 'px';
     wordPopup.style.top = Math.max(8, rect.top - 36) + 'px';
     wordPopup.style.display = 'block';
+    if(chip.dataset.speak){
+      speak(chip.dataset.speak);
+    }
     e.stopPropagation();
   } else if(!e.target.closest('.word-popup')){
     wordPopup.style.display = 'none';
