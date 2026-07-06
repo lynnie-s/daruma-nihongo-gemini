@@ -895,7 +895,10 @@ ${currentCharacter.extraRule}
 2. **本当の誤りを正確に見抜く**:助詞の誤用(は/が、に/で、を/がなど)、動詞の活用ミス、自動詞・他動詞の混同、時制の不一致、語順の誤り、不自然な語彙選択、意味が変わってしまう誤りなど、教える価値のある明らかな誤りは見逃さず指摘すること。台湾人日本語学習者によくある誤りのパターン(中国語からの直訳による不自然さ、助詞の脱落、「〜は〜です」の過剰使用など)にも注意すること。
 3. **過剰訂正はしない**:文法的に許容される口語表現、話し言葉特有の省略、キャラクターの個性に合った砕けた言い回しは誤りとして扱わないこと。「正しいけど硬い」文を「もっと自然な」文に変える程度の些細な言い換えは行わない。
 4. **needsCorrection を true にするのは、実際に文法・語彙・助詞の誤りがあり、指摘することが学習者のためになる場合のみ**。判断に迷う場合は false にする(過剰な訂正よりも、会話の流れを優先する)。
-5. **explanationZh は 100% 繁體中文で書くこと。日本語の単語や漢字表現を一切混ぜてはいけない**(例:「這個助詞用法不對」のように書き、「この助詞の使い方」のような日本語混じりは禁止)。
+5. **explanationZh は 100% 繁體中文で書くこと。日本語の文・単語・助詞・助動詞を一切含めてはいけない**。出力する前に必ず自己チェックすること:「この文章にひらがな・カタカナ・日本語の助詞(は/が/の/です/ます等)が1文字でも含まれていないか?」を確認し、含まれていたら全て繁體中文に書き直してから出力すること。
+   - ❌ 悪い例(絶対禁止):「「消したりするの練習」という表現は少し不自然です。」のような日本語の文をそのまま説明に使うこと。
+   - ✅ 良い例:「消したりする」這個説法有點不自然,用「消す練習」或「消したりする練習」會更自然。
+   - 説明の中で元の日本語表現を引用する場合は、単語だけを「」で囲んで引用してよいが(例:「〜する」の部分)、説明文自体(文章としてつながる部分)は必ず繁體中文で書くこと。
 6. 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
 7. 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
 }
@@ -960,9 +963,21 @@ function addUserMessage(text){
   return { wrap, bubble };
 }
 
+function stripQuotedJapanese(text){
+  return (text || '').replace(/「[^」]*」/g, '');
+}
+function containsJapaneseKana(text){
+  return /[\u3040-\u309F\u30A0-\u30FF]/.test(text || '');
+}
+
 function buildCorrectionCard(correction){
   const card = document.createElement('div');
   card.className='correction-card';
+  const explain = correction.explanationZh || '';
+  const hasStrayJapanese = explain && containsJapaneseKana(stripQuotedJapanese(explain));
+  if(hasStrayJapanese){
+    console.warn('訂正說明疑似混有日文(不在「」引號內):', explain);
+  }
   card.innerHTML = `
     <div class="card-head">
       <div class="label">💡 正確な言い方</div>
@@ -971,7 +986,7 @@ function buildCorrectionCard(correction){
       </button>
     </div>
     <span class="corrected-jp">${renderRuby(correction.correctedSegments || [])}</span>
-    ${correction.explanationZh ? `<div class="correction-explain">${escapeHtml(correction.explanationZh)}</div>` : ''}
+    ${explain ? `<div class="correction-explain">${hasStrayJapanese ? '⚠️ ' : ''}${escapeHtml(explain)}</div>` : ''}
   `;
   card.querySelector('.speak-btn').addEventListener('click', ()=> speak(buildSpeechText(correction.correctedSegments)));
   return card;
