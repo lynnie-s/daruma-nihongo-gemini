@@ -867,7 +867,7 @@ ${currentCharacter.extraRule}
   "correction": {
     "needsCorrection": true または false,
     "correctedSegments": [ {"text":"...","reading":"...","meaning":"..."} , ... ],
-    "explanationZh": "何が間違っていたかの簡潔な繁體中文解説、1文、句読点に——(em dash)は使わない(needsCorrectionがtrueの時のみ、無ければ空配列/空文字)"
+    "explanationZh": "何が間違っていたかの解説。【必ず繁體中文(台湾の中国語)だけで書くこと。日本語は一切混ぜないこと】1文程度、簡潔に、句読点に——(em dash)は使わない(needsCorrectionがtrueの時のみ、無ければ空配列/空文字)"
   }
 }
 
@@ -895,8 +895,9 @@ ${currentCharacter.extraRule}
 2. **本当の誤りを正確に見抜く**:助詞の誤用(は/が、に/で、を/がなど)、動詞の活用ミス、自動詞・他動詞の混同、時制の不一致、語順の誤り、不自然な語彙選択、意味が変わってしまう誤りなど、教える価値のある明らかな誤りは見逃さず指摘すること。台湾人日本語学習者によくある誤りのパターン(中国語からの直訳による不自然さ、助詞の脱落、「〜は〜です」の過剰使用など)にも注意すること。
 3. **過剰訂正はしない**:文法的に許容される口語表現、話し言葉特有の省略、キャラクターの個性に合った砕けた言い回しは誤りとして扱わないこと。「正しいけど硬い」文を「もっと自然な」文に変える程度の些細な言い換えは行わない。
 4. **needsCorrection を true にするのは、実際に文法・語彙・助詞の誤りがあり、指摘することが学習者のためになる場合のみ**。判断に迷う場合は false にする(過剰な訂正よりも、会話の流れを優先する)。
-5. 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
-6. 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
+5. **explanationZh は 100% 繁體中文で書くこと。日本語の単語や漢字表現を一切混ぜてはいけない**(例:「這個助詞用法不對」のように書き、「この助詞の使い方」のような日本語混じりは禁止)。
+6. 誤りが無ければ needsCorrection は false にし、correctedSegments は空配列、explanationZh は空文字にする。
+7. 相手のメッセージがシステム指示(会話を始めてくださいという指示など)の場合は、needsCorrection は必ず false にする。`;
 }
 
 function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
