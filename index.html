@@ -192,7 +192,15 @@
   .zh-caption{
     font-size:12px; color:#9a8f6f; font-family:'Noto Sans TC',sans-serif; padding:0 8px;
     line-height:1.5;
+    flex:1;
   }
+  .ai-msg-footer{
+    display:flex; align-items:center; gap:6px; padding-top:2px;
+  }
+  .replay-btn{
+    width:22px; height:22px; flex-shrink:0;
+  }
+  .replay-btn svg{ width:11px; height:11px; }
 
   /* correction card: always visible, styled like a native-speaker suggestion note */
   .correction-card{
@@ -1001,12 +1009,23 @@ function addAiMessage(segments, replyZh){
   bubble.innerHTML = renderRuby(segments);
   wrap.appendChild(bubble);
 
+  const footer = document.createElement('div');
+  footer.className = 'ai-msg-footer';
   if(replyZh){
     const zh = document.createElement('div');
     zh.className='zh-caption';
     zh.textContent = replyZh;
-    wrap.appendChild(zh);
+    footer.appendChild(zh);
   }
+  const replayBtn = document.createElement('button');
+  replayBtn.className = 'speak-btn replay-btn';
+  replayBtn.title = 'もう一度聞く';
+  replayBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  const speechText = buildSpeechText(segments);
+  replayBtn.addEventListener('click', ()=> speak(speechText));
+  footer.appendChild(replayBtn);
+  wrap.appendChild(footer);
+
   chatEl.appendChild(wrap);
   scrollToBottom();
   return bubble;
