@@ -1047,7 +1047,7 @@ function removeTyping(){
   if(el) el.remove();
 }
 
-async function callClaudeMessages(msgs){
+async function callClaudeMessages(msgs, isRetry){
   let response;
   try{
     response = await fetch("/api/chat", {
@@ -1055,7 +1055,7 @@ async function callClaudeMessages(msgs){
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 3200,
+        max_tokens: 5000,
         system: buildSystemPrompt(),
         messages: msgs
       })
@@ -1083,9 +1083,13 @@ async function callClaudeMessages(msgs){
     if(!parsed.userSegments) parsed.userSegments = null;
   }catch(e){
     console.error('JSON解析失敗,原始內容:', raw);
+    if(!isRetry){
+      // 大多數解析失敗是暫時性的(生成內容被截斷等),先自動重試一次,使用者不會感覺到中斷
+      return callClaudeMessages(msgs, true);
+    }
     parsed = {
-      reply:[{text: "ごめん、ちょっと文が長すぎたかも。もう少し短く言ってみてくれる？", reading:null}],
-      replyZh:"抱歉,可能訊息太長處理不完整。可以試著講短一點嗎?",
+      reply:[{text: "ごめん、ちょっとうまく答えられなかったみたい。もう一度送ってみてくれる？", reading:null}],
+      replyZh:"抱歉,剛剛處理有點問題,可以再送一次試試看嗎?",
       userSegments: null,
       correction:{needsCorrection:false, correctedSegments:[], explanationZh:""}
     };

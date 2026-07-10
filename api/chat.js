@@ -48,7 +48,7 @@ async function callGemini(model, apiKey, system, contents, maxOutputTokens){
         system_instruction: { parts: [{ text: system || '' }] },
         contents,
         generationConfig: {
-          maxOutputTokens: maxOutputTokens || 3200,
+          maxOutputTokens: maxOutputTokens || 5000,
           responseMimeType: 'application/json'
         }
       })
